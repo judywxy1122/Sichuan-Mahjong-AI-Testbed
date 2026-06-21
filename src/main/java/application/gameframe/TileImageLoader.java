@@ -6,8 +6,9 @@ import model.basic.TileTypeEnum;
 
 import javax.imageio.ImageIO;
 import java.awt.*;
-import java.io.File;
 import java.io.IOException;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -20,10 +21,9 @@ public class TileImageLoader {
             Map<Integer, Image> typeImages = new HashMap<>();
             Map<Integer, Image> tableTypeImages = new HashMap<>();
             for (int number = 1; number <= 9; number++) {
-                String path = "C:\\Users\\DELL\\Desktop\\Mahjong\\MahjongGame\\Mahjong-Game-Java\\img\\" +
-                        type.getEnglish() + "\\0" + number + ".png";
+                Path path = Paths.get("img", type.getEnglish(), "0" + number + ".png");
                 try {
-                    Image image = ImageIO.read(new File(path));
+                    Image image = ImageIO.read(path.toFile());
                     Image scaled = image.getScaledInstance(Config.TILE_WIDTH, (int) Config.TILE_HEIGHT, Image.SCALE_SMOOTH);
                     typeImages.put(number, scaled);
 

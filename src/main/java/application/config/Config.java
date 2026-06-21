@@ -45,9 +45,9 @@ public class Config {
 
     //AITable
     public static final int AI_TABLE_PADDING = 200;
-    public static final int AI_TABLE_Y = 100;
+    public static final int AI_TABLE_Y = 145;
     public static final int AI_TABLE_WIDTH = 250;
-    public static final int AI_TABLE_HEIGHT = 300;
+    public static final int AI_TABLE_HEIGHT = 260;
     public static final int AI_TABLE_NUM_TILES_PER_LINE = 5;
 
 

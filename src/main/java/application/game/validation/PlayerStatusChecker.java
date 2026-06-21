@@ -51,14 +51,8 @@ public class PlayerStatusChecker {
     public void updateStatus() {
         this.player.clearStatus();
         if (this.checkHu()) {
-            if (this.player.isPlaying()) {
-                System.out.println(this.player.getHand());
-                this.player.setHuStatus();
-                System.out.println("setted hu status to " + this.player.getName());
-            } else {
-                this.player.setChowStatus();
-                System.out.println("setted chow status to " + this.player.getName());
-            }
+            this.player.setHuStatus();
+            System.out.println("setted hu status to " + this.player.getName());
         }
         if (this.pungKongChecker.canPung()) {
             this.player.setPungStatus();

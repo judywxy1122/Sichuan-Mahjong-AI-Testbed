@@ -3,6 +3,7 @@ package application.gameframe;
 import application.config.Config;
 import model.basic.Entity;
 import model.basic.Tile;
+import model.players.Player;
 import model.tiles.Group;
 import model.tiles.GroupEnum;
 
@@ -10,6 +11,7 @@ import java.awt.*;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 
 public class Drawer {
 
@@ -48,17 +50,22 @@ public class Drawer {
         g2.setFont(new Font("Arial", Font.PLAIN, 15)); // Choose the font and its size
         g2.setColor(Color.WHITE); // Choose a color for the text
         int lineHeight = g2.getFontMetrics().getHeight(); // The height of a line of text
-        int padding = 100; // Padding around the log window
+        int top = 140;
+        int bottomPadding = 80;
         int logWindowWidth = 400; // Width of the log window
-        int logWindowX = this.width - logWindowWidth; // X coordinate of the log window
+        int logWindowX = this.width - logWindowWidth - 24; // X coordinate of the log window
+        int logWindowHeight = this.height - top - bottomPadding;
         int textPadding = 20;
         g2.setColor(Color.BLACK); // Set the background color of the log window
-        g2.fillRect(logWindowX, padding, logWindowWidth, this.height - padding * 2);
+        g2.fillRect(logWindowX, top, logWindowWidth, logWindowHeight);
         g2.setColor(Color.WHITE); // Change color for the text
 
-        for (int i = 0; i < logs.size(); i++) {
+        int maxVisibleLogs = Math.max(0, (logWindowHeight - textPadding * 2) / lineHeight);
+        int start = Math.max(0, logs.size() - maxVisibleLogs);
+        for (int i = start; i < logs.size(); i++) {
             String log = logs.get(i);
-            g2.drawString(log, logWindowX + textPadding, padding + textPadding + i * lineHeight);
+            int visibleIndex = i - start;
+            g2.drawString(log, logWindowX + textPadding, top + textPadding + visibleIndex * lineHeight);
         }
     }
 
@@ -77,17 +84,153 @@ public class Drawer {
         g2.drawString("Press 'S' to Skip", 30, 510);
     }
 
-    public void drawHelperBoxes() {
-        Entity playerHand = new Entity(Config.PLAYER_HAND_X, Config.PLAYER_HAND_Y, Config.PLAYER_HAND_WIDTH, Config.PLAYER_HAND_HEIGHT);
-        Entity playerTable = new Entity(Config.PLAYER_TABLE_X, Config.PLAYER_TABLE_Y, Config.PLAYER_TABLE_WIDTH, Config.PLAYER_TABLE_HEIGHT);
-        Entity ai1Table = new Entity(Config.AI1_TABLE_X, Config.AI1_TABLE_Y, Config.AI1_TABLE_WIDTH, Config.AI1_TABLE_HEIGHT);
-        Entity ai2Table = new Entity(Config.AI2_TABLE_X, Config.AI2_TABLE_Y, Config.AI2_TABLE_WIDTH, Config.AI2_TABLE_HEIGHT);
-        Entity ai3Table = new Entity(Config.AI3_TABLE_X, Config.AI3_TABLE_Y, Config.AI3_TABLE_WIDTH, Config.AI3_TABLE_HEIGHT);
-        this.drawRect(playerHand);
-        this.drawRect(playerTable);
-        this.drawRect(ai1Table);
-        this.drawRect(ai2Table);
-        this.drawRect(ai3Table);
+    public void drawHelperBoxes(Player turnPlayer, Player lastActionPlayer, String lastActionText, String statusText,
+                                Player winner, Rectangle winningHandButtonBounds,
+                                Map<String, Rectangle> actionButtonBounds,
+                                Map<String, Rectangle> endGameButtonBounds) {
+        this.drawPlayerArea(new Entity(Config.PLAYER_HAND_X, Config.PLAYER_HAND_Y, Config.PLAYER_HAND_WIDTH, Config.PLAYER_HAND_HEIGHT),
+                "YOU", 0, turnPlayer, lastActionPlayer);
+        this.drawPlayerArea(new Entity(Config.PLAYER_TABLE_X, Config.PLAYER_TABLE_Y, Config.PLAYER_TABLE_WIDTH, Config.PLAYER_TABLE_HEIGHT),
+                "YOUR DISCARDS", 0, turnPlayer, lastActionPlayer);
+        this.drawPlayerArea(new Entity(Config.AI1_TABLE_X, Config.AI1_TABLE_Y, Config.AI1_TABLE_WIDTH, Config.AI1_TABLE_HEIGHT),
+                "NEXT: AI1", 1, turnPlayer, lastActionPlayer);
+        this.drawPlayerArea(new Entity(Config.AI2_TABLE_X, Config.AI2_TABLE_Y, Config.AI2_TABLE_WIDTH, Config.AI2_TABLE_HEIGHT),
+                "OPPOSITE: AI2", 2, turnPlayer, lastActionPlayer);
+        this.drawPlayerArea(new Entity(Config.AI3_TABLE_X, Config.AI3_TABLE_Y, Config.AI3_TABLE_WIDTH, Config.AI3_TABLE_HEIGHT),
+                "PREV: AI3", 3, turnPlayer, lastActionPlayer);
+
+        this.drawStatusBanner(lastActionText, statusText, winner, winningHandButtonBounds,
+                actionButtonBounds, endGameButtonBounds);
+    }
+
+    private void drawStatusBanner(String lastActionText, String statusText, Player winner, Rectangle winningHandButtonBounds,
+                                  Map<String, Rectangle> actionButtonBounds,
+                                  Map<String, Rectangle> endGameButtonBounds) {
+        int x = 25;
+        int y = 25;
+        int width = this.width - 50;
+        int height = 95;
+
+        g2.setColor(new Color(0, 0, 0, 105));
+        g2.fillRect(x, y, width, height);
+        g2.setColor(new Color(255, 245, 120));
+        g2.setStroke(new BasicStroke(2));
+        g2.drawRect(x, y, width, height);
+        g2.setStroke(new BasicStroke(1));
+
+        g2.setFont(new Font("Arial", Font.BOLD, 20));
+        g2.setColor(new Color(255, 245, 120));
+        if (lastActionText != null && !lastActionText.isEmpty()) {
+            g2.drawString("Last action: " + lastActionText, x + 14, y + 30);
+        }
+
+        g2.setFont(new Font("Arial", Font.PLAIN, 18));
+        g2.setColor(Color.WHITE);
+        int statusTextWidth = width - 28;
+        if (endGameButtonBounds != null && !endGameButtonBounds.isEmpty()) {
+            int leftMostButtonX = endGameButtonBounds.values().stream()
+                    .mapToInt(bounds -> bounds.x)
+                    .min()
+                    .orElse(x + width);
+            statusTextWidth = leftMostButtonX - x - 28;
+        } else if (winner != null && winningHandButtonBounds != null) {
+            statusTextWidth = winningHandButtonBounds.x - x - 28;
+        } else if (actionButtonBounds != null && !actionButtonBounds.isEmpty()) {
+            int leftMostButtonX = actionButtonBounds.values().stream()
+                    .mapToInt(bounds -> bounds.x)
+                    .min()
+                    .orElse(x + width);
+            statusTextWidth = leftMostButtonX - x - 28;
+        }
+        this.drawWrappedText(statusText, x + 14, y + 58, statusTextWidth, 22, 2);
+
+        if (winner != null && winningHandButtonBounds != null) {
+            g2.setColor(new Color(255, 245, 120));
+            g2.fillRect(winningHandButtonBounds.x, winningHandButtonBounds.y,
+                    winningHandButtonBounds.width, winningHandButtonBounds.height);
+            g2.setColor(new Color(35, 70, 45));
+            g2.setFont(new Font("Arial", Font.BOLD, 15));
+            g2.drawString("View winning hand", winningHandButtonBounds.x + 16, winningHandButtonBounds.y + 22);
+        }
+
+        if (endGameButtonBounds != null && !endGameButtonBounds.isEmpty()) {
+            for (Map.Entry<String, Rectangle> entry : endGameButtonBounds.entrySet()) {
+                this.drawActionButton(entry.getKey(), entry.getValue());
+            }
+        }
+
+        if (winner == null && actionButtonBounds != null && !actionButtonBounds.isEmpty()) {
+            for (Map.Entry<String, Rectangle> entry : actionButtonBounds.entrySet()) {
+                this.drawActionButton(entry.getKey(), entry.getValue());
+            }
+        }
+    }
+
+    private void drawActionButton(String label, Rectangle bounds) {
+        g2.setColor(new Color(255, 245, 120));
+        g2.fillRect(bounds.x, bounds.y, bounds.width, bounds.height);
+        g2.setColor(new Color(35, 70, 45));
+        g2.setFont(new Font("Arial", Font.BOLD, 15));
+        FontMetrics metrics = g2.getFontMetrics();
+        int textX = bounds.x + (bounds.width - metrics.stringWidth(label)) / 2;
+        int textY = bounds.y + (bounds.height + metrics.getAscent() - metrics.getDescent()) / 2;
+        g2.drawString(label, textX, textY);
+    }
+
+    private void drawWrappedText(String text, int x, int y, int maxWidth, int lineHeight, int maxLines) {
+        if (text == null || text.isEmpty()) {
+            return;
+        }
+        FontMetrics metrics = g2.getFontMetrics();
+        String[] words = text.split(" ");
+        StringBuilder line = new StringBuilder();
+        int linesDrawn = 0;
+        for (String word : words) {
+            String nextLine = line.length() == 0 ? word : line + " " + word;
+            if (metrics.stringWidth(nextLine) <= maxWidth) {
+                line = new StringBuilder(nextLine);
+            } else {
+                g2.drawString(line.toString(), x, y + linesDrawn * lineHeight);
+                linesDrawn++;
+                if (linesDrawn == maxLines) {
+                    return;
+                }
+                line = new StringBuilder(word);
+            }
+        }
+        if (line.length() > 0 && linesDrawn < maxLines) {
+            g2.drawString(line.toString(), x, y + linesDrawn * lineHeight);
+        }
+    }
+
+    private void drawPlayerArea(Entity entity, String label, int playerPosition, Player turnPlayer, Player lastActionPlayer) {
+        boolean isCurrentTurn = turnPlayer != null && turnPlayer.getPosition() == playerPosition;
+        boolean isLastAction = lastActionPlayer != null && lastActionPlayer.getPosition() == playerPosition;
+
+        if (isLastAction) {
+            g2.setColor(new Color(255, 225, 80, 70));
+            g2.fillRect((int) entity.x, (int) entity.y, entity.width, entity.height);
+        } else if (isCurrentTurn) {
+            g2.setColor(new Color(90, 190, 255, 45));
+            g2.fillRect((int) entity.x, (int) entity.y, entity.width, entity.height);
+        }
+
+        if (isLastAction) {
+            g2.setColor(new Color(255, 225, 80));
+            g2.setStroke(new BasicStroke(4));
+        } else if (isCurrentTurn) {
+            g2.setColor(new Color(90, 190, 255));
+            g2.setStroke(new BasicStroke(3));
+        } else {
+            g2.setColor(Color.WHITE);
+            g2.setStroke(new BasicStroke(1));
+        }
+        g2.drawRect((int) entity.x, (int) entity.y, entity.width, entity.height);
+        g2.setStroke(new BasicStroke(1));
+
+        g2.setFont(new Font("Arial", Font.BOLD, 15));
+        g2.setColor(Color.WHITE);
+        g2.drawString(label, (int) entity.x + 10, (int) entity.y + 22);
     }
 
     public void drawTile(Tile tile, Color color) {

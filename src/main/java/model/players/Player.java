@@ -73,6 +73,14 @@ public class Player {
                 || this.status.contains(PlayerStatusEnum.ADD_KONG);
     }
 
+    public boolean containsHu() {
+        return this.status.contains(PlayerStatusEnum.HU);
+    }
+
+    public boolean containsResponseAction() {
+        return this.containsHu() || this.containsChouPungKong();
+    }
+
     public boolean containsChouPungKong() {
         return this.status.contains(PlayerStatusEnum.CHOW)
                 || this.status.contains(PlayerStatusEnum.PUNG)
@@ -133,6 +141,7 @@ public class Player {
     }
 
     public void clearStatus() {
+        this.status.remove(PlayerStatusEnum.HU);
         this.clearChowStatus();
         this.clearKongStatus();
         this.clearPungStatus();

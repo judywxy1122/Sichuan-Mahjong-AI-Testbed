@@ -22,7 +22,20 @@ This repository contains the source code for a fully implemented Sichuan Mahjong
 
 ## Getting Started
 
-To start playing, simply clone the repository and run the main file. If there is an error due to assets on a different system path, simply change the path.
+To start playing, install Java 8+ and Maven, then run:
+
+```bash
+mvn compile exec:java
+```
+
+The game loads tile images from `img/` and AI probability tables from `probability/`, relative to the project root.
+
+### Controls
+
+- Click one of your hand tiles to play it when it is your turn.
+- Press `H` to Hu when available.
+- Press `C`, `P`, or `K` to Chow, Pung, or Kong when available.
+- Press `S` to skip a Chow/Pung/Kong prompt.
 
 ## Customizing AI
 
