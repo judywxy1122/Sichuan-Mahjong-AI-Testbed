@@ -9,10 +9,16 @@ import model.players.PlayerStatusEnum;
 import model.tiles.Group;
 
 import javax.swing.*;
+import javax.sound.sampled.AudioInputStream;
+import javax.sound.sampled.AudioSystem;
+import javax.sound.sampled.Clip;
+import javax.sound.sampled.LineUnavailableException;
+import javax.sound.sampled.UnsupportedAudioFileException;
 
 import java.io.IOException;
 import java.awt.*;
 import java.awt.event.*;
+import java.nio.file.Paths;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -38,6 +44,7 @@ public class GamePanel extends JPanel implements Runnable {
     private Map<String, Rectangle> actionButtonBounds = new LinkedHashMap<>();
     private Map<String, Rectangle> endGameButtonBounds = new LinkedHashMap<>();
     private final ImageIcon rewardIcon = new ImageIcon("img/reward/dollar_sign_01.gif");
+    private static final String REWARD_SOUND_PATH = "sound/slot_win_01.wav";
     private final List<String> rewardUrls = Collections.unmodifiableList(Arrays.asList(
             "https://www.tiktok.com/@innahbee/video/7527297056680070408",
             "https://www.tiktok.com/@innahbee/video/7516930359687269650",
@@ -478,18 +485,44 @@ public class GamePanel extends JPanel implements Runnable {
         }
         rewardCelebrationPlayed = true;
         Thread soundThread = new Thread(() -> {
-            for (int i = 0; i < 3; i++) {
-                Toolkit.getDefaultToolkit().beep();
-                try {
-                    Thread.sleep(140);
-                } catch (InterruptedException e) {
-                    Thread.currentThread().interrupt();
-                    return;
-                }
+            try {
+                playRewardSoundClip();
+            } catch (IOException | LineUnavailableException | UnsupportedAudioFileException e) {
+                playFallbackRewardBeeps();
             }
         }, "reward-celebration-sound");
         soundThread.setDaemon(true);
         soundThread.start();
+    }
+
+    private void playRewardSoundClip()
+            throws IOException, LineUnavailableException, UnsupportedAudioFileException {
+        try (AudioInputStream audioInputStream =
+                     AudioSystem.getAudioInputStream(Paths.get(REWARD_SOUND_PATH).toFile())) {
+            Clip clip = AudioSystem.getClip();
+            clip.open(audioInputStream);
+            clip.start();
+            long durationMs = Math.max(100, clip.getMicrosecondLength() / 1000);
+            try {
+                Thread.sleep(durationMs + 80);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            } finally {
+                clip.close();
+            }
+        }
+    }
+
+    private void playFallbackRewardBeeps() {
+        for (int i = 0; i < 3; i++) {
+            Toolkit.getDefaultToolkit().beep();
+            try {
+                Thread.sleep(140);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                return;
+            }
+        }
     }
 
     private void startRewardAnimationTimer() {

@@ -282,16 +282,19 @@ public class Game {
         player.addTile(drawnTile);
         player.setPlayingStatus();
         new PlayerStatusChecker(player, player.getHand().getNewTile());
-        if (this.player.containsChouPungKong()) {
-            this.statusText = "You konged " + this.formatTile(claimedTile)
-                    + " and drew " + this.formatTile(drawnTile)
-                    + ". Choose K Kong or S Skip.";
-            log.addMessage("press k to kong or s to skip");
-            return;
-        }
         this.gameTurn = new GameTurn(this.players, player);
         this.turnPlayer = gameTurn.next();
         this.turnPlayer.setPlayingStatus();
+        if (player == this.player) {
+            this.statusText = this.buildPostKongPlayerPrompt(claimedTile, drawnTile);
+            log.addMessage("player kong, now choose action or play 1 tile");
+            return;
+        }
+
+        if (player.containsHu()) {
+            this.processHu(player);
+            return;
+        }
         this.turnPlayer.clearStatus();
         this.statusText = this.buildClaimTurnPrompt(player, "konged", claimedTile);
         log.addMessage(this.turnPlayer.getName() + " kong, now play 1 tile");
@@ -299,6 +302,14 @@ public class Game {
     }
 
     public void processSkip(Player player) {
+        if (player == this.turnPlayer && player.isPlaying()) {
+            player.clearKongStatus();
+            player.setPlayingStatus();
+            this.recordAction(player, "skip kong");
+            this.statusText = this.buildPlayerTurnPrompt(player.getHand().getNewTile());
+            log.addMessage(player.getName() + " skipped kong, now play 1 tile");
+            return;
+        }
         player.clearStatus();
         gameTurn.getPlayerAfter(turnPlayer).setPlayingStatus();
         this.recordAction(player, "skip");
@@ -364,7 +375,28 @@ public class Game {
         }
         if (this.player.containsKong()) {
             actions.add("K Kong");
-            actions.add("S Skip");
+            actions.add("S Skip Kong");
+        }
+        if (!actions.isEmpty()) {
+            prompt.append(" Available: ").append(String.join(" / ", actions)).append(".");
+        }
+        return prompt.toString();
+    }
+
+    private String buildPostKongPlayerPrompt(Tile kongTile, Tile drawnTile) {
+        StringBuilder prompt = new StringBuilder("You konged ")
+                .append(this.formatTile(kongTile))
+                .append(" and drew ")
+                .append(this.formatTile(drawnTile))
+                .append(". Click one tile to discard.");
+
+        List<String> actions = new ArrayList<>();
+        if (this.player.getStatus().contains(PlayerStatusEnum.HU)) {
+            actions.add("H Hu");
+        }
+        if (this.player.containsKong()) {
+            actions.add("K Kong");
+            actions.add("S Skip Kong");
         }
         if (!actions.isEmpty()) {
             prompt.append(" Available: ").append(String.join(" / ", actions)).append(".");
