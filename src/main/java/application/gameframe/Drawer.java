@@ -7,7 +7,11 @@ import model.players.Player;
 import model.tiles.Group;
 import model.tiles.GroupEnum;
 
+import javax.imageio.ImageIO;
 import java.awt.*;
+import java.awt.image.BufferedImage;
+import java.io.IOException;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -19,6 +23,8 @@ public class Drawer {
     private final int width;
     private final int height;
     private final TileImageLoader imageLoader;
+    private static BufferedImage photoBackground;
+    private static boolean photoBackgroundLoadAttempted = false;
 
     public Drawer(Graphics2D g2, int width, int height, TileImageLoader imageLoader) {
         this.g2 = g2;
@@ -28,6 +34,48 @@ public class Drawer {
     }
 
     public void drawBackground() {
+        if (Config.USE_PHOTO_BACKGROUND && drawPhotoBackground()) {
+            return;
+        }
+        drawFeltBackground();
+    }
+
+    private boolean drawPhotoBackground() {
+        BufferedImage background = getPhotoBackground();
+        if (background == null) {
+            return false;
+        }
+
+        int sourceWidth = background.getWidth();
+        int sourceHeight = background.getHeight();
+        double scale = Math.max(this.width / (double) sourceWidth, this.height / (double) sourceHeight);
+        int scaledWidth = (int) Math.ceil(sourceWidth * scale);
+        int scaledHeight = (int) Math.ceil(sourceHeight * scale);
+        int x = (this.width - scaledWidth) / 2;
+        int y = (this.height - scaledHeight) / 2;
+
+        g2.drawImage(background, x, y, scaledWidth, scaledHeight, null);
+
+        g2.setColor(new Color(0, 20, 32, 120));
+        g2.fillRect(0, 0, this.width, this.height);
+        g2.setColor(new Color(0, 0, 0, 45));
+        g2.fillRect(0, 0, this.width, this.height);
+        return true;
+    }
+
+    private BufferedImage getPhotoBackground() {
+        if (!photoBackgroundLoadAttempted) {
+            photoBackgroundLoadAttempted = true;
+            try {
+                photoBackground = ImageIO.read(Paths.get(Config.BACKGROUND_IMAGE_PATH).toFile());
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
+        return photoBackground;
+    }
+
+    private void drawFeltBackground() {
         Color baseGreen = new Color(30, 100, 60);
         Color highlightGreen = new Color(60, 130, 80);
 
@@ -145,12 +193,7 @@ public class Drawer {
         this.drawWrappedText(statusText, x + 14, y + 58, statusTextWidth, 22, 2);
 
         if (winner != null && winningHandButtonBounds != null) {
-            g2.setColor(new Color(255, 245, 120));
-            g2.fillRect(winningHandButtonBounds.x, winningHandButtonBounds.y,
-                    winningHandButtonBounds.width, winningHandButtonBounds.height);
-            g2.setColor(new Color(35, 70, 45));
-            g2.setFont(new Font("Arial", Font.BOLD, 15));
-            g2.drawString("View winning hand", winningHandButtonBounds.x + 16, winningHandButtonBounds.y + 22);
+            this.drawActionButton("View winning hand", winningHandButtonBounds);
         }
 
         if (endGameButtonBounds != null && !endGameButtonBounds.isEmpty()) {
@@ -167,9 +210,16 @@ public class Drawer {
     }
 
     private void drawActionButton(String label, Rectangle bounds) {
-        g2.setColor(new Color(255, 245, 120));
-        g2.fillRect(bounds.x, bounds.y, bounds.width, bounds.height);
-        g2.setColor(new Color(35, 70, 45));
+        g2.setColor(new Color(0, 0, 0, 150));
+        g2.fillRoundRect(bounds.x + 4, bounds.y + 4, bounds.width, bounds.height, 6, 6);
+
+        g2.setColor(new Color(255, 242, 78));
+        g2.fillRoundRect(bounds.x, bounds.y, bounds.width, bounds.height, 6, 6);
+        g2.setColor(new Color(20, 35, 30));
+        g2.setStroke(new BasicStroke(2));
+        g2.drawRoundRect(bounds.x, bounds.y, bounds.width, bounds.height, 6, 6);
+        g2.setStroke(new BasicStroke(1));
+
         g2.setFont(new Font("Arial", Font.BOLD, 15));
         FontMetrics metrics = g2.getFontMetrics();
         int textX = bounds.x + (bounds.width - metrics.stringWidth(label)) / 2;

@@ -21,6 +21,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
+import java.util.concurrent.TimeUnit;
 
 import static utils.TileUtils.*;
 
@@ -36,6 +37,7 @@ public class GamePanel extends JPanel implements Runnable {
     private Rectangle winningHandButtonBounds = new Rectangle();
     private Map<String, Rectangle> actionButtonBounds = new LinkedHashMap<>();
     private Map<String, Rectangle> endGameButtonBounds = new LinkedHashMap<>();
+    private final ImageIcon rewardIcon = new ImageIcon("img/reward/dollar_sign_01.gif");
     private final List<String> rewardUrls = Collections.unmodifiableList(Arrays.asList(
             "https://www.tiktok.com/@innahbee/video/7527297056680070408",
             "https://www.tiktok.com/@innahbee/video/7516930359687269650",
@@ -44,9 +46,21 @@ public class GamePanel extends JPanel implements Runnable {
             "https://www.tiktok.com/@innahbee/video/7519162164683361554",
             "https://www.tiktok.com/@innahbee/video/7379244215131213061",
             "https://www.tiktok.com/@innahbee/video/7416723958856158471",
-            "https://www.tiktok.com/@innahbee/video/7299467527459966214"
+            "https://www.tiktok.com/@innahbee/video/7299467527459966214",
+            "https://www.tiktok.com/@shakira/video/7637621329239264542",
+            "https://www.tiktok.com/@shakira/video/7637147185368337694",
+            "https://www.tiktok.com/@shakira/video/7653975849384938782",
+            "https://www.tiktok.com/@shakira/video/7650978235496271135",
+            "https://www.tiktok.com/@shakira/video/7648370860759256350",
+            "https://www.tiktok.com/@shakira/video/7645778945740262687",
+            "https://www.tiktok.com/@shakira/video/7643914092557634829",
+            "https://www.tiktok.com/@shakira/video/7643129251356511502",
+            "https://www.tiktok.com/@shakira/video/7642117041159195935",
+            "https://www.tiktok.com/@gqspain/video/7650216595243158806"
     ));
     private final Random rewardRandom = new Random();
+    private boolean rewardCelebrationPlayed = false;
+    private Timer rewardAnimationTimer;
 
     public GamePanel() {
         this.game = new Game();
@@ -87,10 +101,13 @@ public class GamePanel extends JPanel implements Runnable {
                     player.plays(hoveredTile);
                     hoveredTile = null;
                     game.processPlayed();
+                    repaint();
                 } else if (!player.isPlaying() && player.containsResponseAction()) {
                     game.showInvalidInput("Response phase: use H/C/P/K to respond, or S to skip.");
+                    repaint();
                 } else {
                     game.showInvalidInput("It is not your discard turn yet.");
+                    repaint();
                 }
             }
         });
@@ -181,6 +198,13 @@ public class GamePanel extends JPanel implements Runnable {
         interactableTiles = drawer.drawPlayerHand(player.getHand().toList(), player.getHand().getNewTile());
         if (hoveredTile != null) {
             drawer.drawTile(hoveredTile, Color.LIGHT_GRAY);
+        }
+        if (shouldShowRewardAnimation()) {
+            drawRewardAnimation(g2);
+            playRewardCelebrationSoundOnce();
+            startRewardAnimationTimer();
+        } else {
+            stopRewardAnimationTimer();
         }
         g2.dispose();
     }
@@ -350,6 +374,7 @@ public class GamePanel extends JPanel implements Runnable {
             default:
                 break;
         }
+        repaint();
         requestFocusInWindow();
     }
 
@@ -373,23 +398,119 @@ public class GamePanel extends JPanel implements Runnable {
             repaint();
             return;
         }
-        if (!Desktop.isDesktopSupported() || !Desktop.getDesktop().isSupported(Desktop.Action.BROWSE)) {
-            showRewardError("Cannot open browser from this desktop environment.");
-            return;
-        }
-
         String url = rewardUrls.get(rewardRandom.nextInt(rewardUrls.size()));
         try {
-            Desktop.getDesktop().browse(URI.create(url));
+            if (!openRewardInChromeFullscreen(url)) {
+                openRewardInDefaultBrowser(url);
+            }
         } catch (IOException | IllegalArgumentException | SecurityException e) {
             showRewardError("Could not open reward video: " + e.getMessage());
         }
         requestFocusInWindow();
     }
 
+    private boolean openRewardInChromeFullscreen(String url) throws IOException {
+        String osName = System.getProperty("os.name", "").toLowerCase();
+        if (!osName.contains("mac")) {
+            return false;
+        }
+
+        Process process = new ProcessBuilder(
+                "open",
+                "-na",
+                "Google Chrome",
+                "--args",
+                "--new-window",
+                "--start-fullscreen",
+                "--app=" + url
+        ).start();
+
+        try {
+            if (process.waitFor(1500, TimeUnit.MILLISECONDS)) {
+                return process.exitValue() == 0;
+            }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            return false;
+        }
+        return true;
+    }
+
+    private void openRewardInDefaultBrowser(String url) throws IOException {
+        if (!Desktop.isDesktopSupported() || !Desktop.getDesktop().isSupported(Desktop.Action.BROWSE)) {
+            throw new IOException("Cannot open browser from this desktop environment.");
+        }
+        Desktop.getDesktop().browse(URI.create(url));
+    }
+
     private void showRewardError(String message) {
         JOptionPane.showMessageDialog(this, message, "Reward unavailable", JOptionPane.WARNING_MESSAGE);
         requestFocusInWindow();
+    }
+
+    private boolean shouldShowRewardAnimation() {
+        return game.getWinner() != null
+                && player.equals(game.getWinner())
+                && endGameButtonBounds.containsKey("Reward");
+    }
+
+    private void drawRewardAnimation(Graphics2D g2) {
+        Rectangle rewardButtonBounds = endGameButtonBounds.get("Reward");
+        if (rewardButtonBounds == null || rewardIcon.getIconWidth() <= 0) {
+            return;
+        }
+
+        int size = 54;
+        int x = rewardButtonBounds.x + (rewardButtonBounds.width - size) / 2;
+        int y = Math.max(24, rewardButtonBounds.y - size - 3);
+        g2.drawImage(rewardIcon.getImage(), x, y, size, size, this);
+
+        g2.setColor(new Color(255, 245, 120, 190));
+        g2.setStroke(new BasicStroke(2));
+        g2.drawRoundRect(rewardButtonBounds.x - 3, rewardButtonBounds.y - 3,
+                rewardButtonBounds.width + 6, rewardButtonBounds.height + 6, 6, 6);
+        g2.setStroke(new BasicStroke(1));
+    }
+
+    private void playRewardCelebrationSoundOnce() {
+        if (rewardCelebrationPlayed) {
+            return;
+        }
+        rewardCelebrationPlayed = true;
+        Thread soundThread = new Thread(() -> {
+            for (int i = 0; i < 3; i++) {
+                Toolkit.getDefaultToolkit().beep();
+                try {
+                    Thread.sleep(140);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    return;
+                }
+            }
+        }, "reward-celebration-sound");
+        soundThread.setDaemon(true);
+        soundThread.start();
+    }
+
+    private void startRewardAnimationTimer() {
+        if (rewardAnimationTimer != null && rewardAnimationTimer.isRunning()) {
+            return;
+        }
+        rewardAnimationTimer = new Timer(100, e -> {
+            if (shouldShowRewardAnimation()) {
+                repaint();
+            } else {
+                stopRewardAnimationTimer();
+            }
+        });
+        rewardAnimationTimer.start();
+    }
+
+    private void stopRewardAnimationTimer() {
+        if (rewardAnimationTimer != null) {
+            rewardAnimationTimer.stop();
+            rewardAnimationTimer = null;
+        }
     }
 
     private void startNewGame() {
@@ -399,6 +520,8 @@ public class GamePanel extends JPanel implements Runnable {
         this.interactableTiles = new ArrayList<>();
         this.actionButtonBounds = new LinkedHashMap<>();
         this.endGameButtonBounds = new LinkedHashMap<>();
+        this.rewardCelebrationPlayed = false;
+        stopRewardAnimationTimer();
         resetKeyState();
         start();
         repaint();

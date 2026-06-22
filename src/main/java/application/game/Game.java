@@ -161,8 +161,12 @@ public class Game {
         if (turnPlayer == this.player) {
             log.addMessage("directing to " + turnPlayer.getName() + " for action");
         } else {
-            turnPlayer.playAction();
-            this.processPlayed();
+            try {
+                turnPlayer.playAction();
+                this.processPlayed();
+            } catch (RuntimeException e) {
+                this.endErroredGame(turnPlayer, e);
+            }
         }
     }
 
@@ -178,7 +182,7 @@ public class Game {
         log.addMessage(this.turnPlayer.getName() + " played " + this.turnPlayer.getTable().getLast());
         this.turnPlayer.setWaitingStatus();
 
-        for (Player p : this.players) {
+        for (Player p : next3Players) {
             if (p.containsHu() && p == this.player) {
                 this.statusText = this.buildResponsePrompt(this.turnPlayer, lastPlayedTile);
                 log.addMessage("For " + lastPlayedTile + ", press h to hu, or s to skip");
@@ -191,18 +195,20 @@ public class Game {
                 log.addMessage("For " + lastPlayedTile + ", press c to chow, p to pung, k to kong, or s to skip");
                 return;
             } else if (p.containsChouPungKong()) {
-                if (p.otherAction(lastPlayedTile) == PlayerActionEnum.CHOW) {
+                PlayerActionEnum action = p.otherAction(lastPlayedTile);
+                if (action == PlayerActionEnum.CHOW) {
                     this.processChou(p);
                     return;
-                } else if (p.otherAction(lastPlayedTile) == PlayerActionEnum.PUNG) {
+                } else if (action == PlayerActionEnum.PUNG) {
                     this.processPung(p);
                     return;
-                } else if (p.otherAction(lastPlayedTile) == PlayerActionEnum.KONG) {
+                } else if (action == PlayerActionEnum.KONG) {
                     this.processKong(p);
                     return;
-                } else if (p.otherAction(lastPlayedTile) == PlayerActionEnum.SKIP) {
-                    this.processSkip(p);
-                    return;
+                } else {
+                    p.clearStatus();
+                    this.recordAction(p, "skip");
+                    log.addMessage(p.getName() + " skipped");
                 }
             }
         }
@@ -313,8 +319,25 @@ public class Game {
         }
         log.addMessage("No more tiles");
         this.ended = true;
+        this.lastActionPlayer = this.turnPlayer;
         this.lastActionText = "wall exhausted";
         this.statusText = "No more tiles. The hand ends in a draw.";
+        this.actionVersion++;
+        Toolkit.getDefaultToolkit().beep();
+    }
+
+    private void endErroredGame(Player actor, RuntimeException e) {
+        if (this.ended) {
+            return;
+        }
+        this.ended = true;
+        this.lastActionPlayer = actor;
+        this.lastActionText = actor.getName() + " error";
+        this.statusText = actor.getName() + " hit an AI/action error: " + e.getMessage()
+                + ". Start a new game.";
+        this.actionVersion++;
+        log.addMessage(this.statusText);
+        e.printStackTrace();
         Toolkit.getDefaultToolkit().beep();
     }
 

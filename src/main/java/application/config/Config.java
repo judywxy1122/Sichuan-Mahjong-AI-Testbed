@@ -4,6 +4,8 @@ public class Config {
     //Settings
     public static final int FPS = 60;
     public static final int LOG_ITEMS = 39;
+    public static final boolean USE_PHOTO_BACKGROUND = true;
+    public static final String BACKGROUND_IMAGE_PATH = "img/background/star_sky_over_sea_01.jpg";
 
     //Frame
     public static final int ORIGINAL_TILE_SIZE = 16;
