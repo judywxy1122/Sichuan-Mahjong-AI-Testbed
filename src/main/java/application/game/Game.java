@@ -446,6 +446,10 @@ public class Game {
         Toolkit.getDefaultToolkit().beep();
     }
 
+    public void showStatus(String message) {
+        this.statusText = message;
+    }
+
 
     // getters
     public GameState getGameState() {
@@ -500,6 +504,10 @@ public class Game {
 
     public Tile getWinningTile() {
         return winningTile;
+    }
+
+    public Tile getLastPlayedTile() {
+        return lastPlayedTile;
     }
 
     public String getLastActionText() {

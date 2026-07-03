@@ -1,5 +1,6 @@
 package application.gameframe;
 
+import aimodel.ProbabilityAI;
 import application.game.Game;
 import model.GameState;
 import application.config.Config;
@@ -41,6 +42,7 @@ public class GamePanel extends JPanel implements Runnable {
     private final TileImageLoader imageLoader = new TileImageLoader();
     private List<Tile> interactableTiles = new ArrayList<>();
     private Rectangle winningHandButtonBounds = new Rectangle();
+    private Rectangle autoPlayButtonBounds = new Rectangle(Config.SCREEN_WIDTH - 190, 35, 145, 40);
     private Map<String, Rectangle> actionButtonBounds = new LinkedHashMap<>();
     private Map<String, Rectangle> endGameButtonBounds = new LinkedHashMap<>();
     private final ImageIcon rewardIcon = new ImageIcon("img/reward/dollar_sign_01.gif");
@@ -68,6 +70,12 @@ public class GamePanel extends JPanel implements Runnable {
     private final Random rewardRandom = new Random();
     private boolean rewardCelebrationPlayed = false;
     private Timer rewardAnimationTimer;
+    private final ProbabilityAI autoPlayer = new ProbabilityAI();
+    private boolean autoPlayEnabled = false;
+    private Timer autoPlayTimer;
+    private String scheduledAutoPlayKey = "";
+    private static final int AUTO_PLAY_DELAY_MS = 3000;
+    private static final String AUTO_PLAY_PENDING_PREFIX = "Auto Play will act in 3s. ";
 
     public GamePanel() {
         this.game = new Game();
@@ -87,17 +95,24 @@ public class GamePanel extends JPanel implements Runnable {
                 if (logicalPoint == null) {
                     return;
                 }
+                if (autoPlayButtonBounds.contains(logicalPoint)) {
+                    toggleAutoPlay();
+                    return;
+                }
                 String endGameAction = getClickedEndGameAction(logicalPoint);
                 if (endGameAction != null) {
+                    cancelAutoPlayTimer();
                     processEndGameButton(endGameAction);
                     return;
                 }
                 if (game.getWinner() != null && winningHandButtonBounds.contains(logicalPoint)) {
+                    cancelAutoPlayTimer();
                     showWinningHandDialog();
                     return;
                 }
                 String action = getClickedAction(logicalPoint);
                 if (action != null) {
+                    cancelAutoPlayTimer();
                     processActionButton(action);
                     return;
                 }
@@ -105,6 +120,7 @@ public class GamePanel extends JPanel implements Runnable {
                     return;
                 }
                 if (player.isPlaying() && !player.containsChouPungKong()) {
+                    cancelAutoPlayTimer();
                     player.plays(hoveredTile);
                     hoveredTile = null;
                     game.processPlayed();
@@ -129,6 +145,7 @@ public class GamePanel extends JPanel implements Runnable {
                 }
                 if (getClickedAction(logicalPoint) != null
                         || getClickedEndGameAction(logicalPoint) != null
+                        || autoPlayButtonBounds.contains(logicalPoint)
                         || (game.getWinner() != null && winningHandButtonBounds.contains(logicalPoint))) {
                     hoveredTile = null;
                     return;
@@ -153,6 +170,7 @@ public class GamePanel extends JPanel implements Runnable {
 
     public void update() {
         if (this.game.isOver()) {
+            cancelAutoPlayTimer();
             this.gameThread = null;
         }
         if (keyHandler.hPressed && !keyHandler.hProcessed
@@ -180,6 +198,7 @@ public class GamePanel extends JPanel implements Runnable {
             this.game.processSkip(player);
             keyHandler.sProcessed = true;
         }
+        updateAutoPlay();
     }
 
     @Override
@@ -196,7 +215,8 @@ public class GamePanel extends JPanel implements Runnable {
         winningHandButtonBounds = buildWinningHandButtonBounds();
         drawer.drawHelperBoxes(this.game.getTurnPlayer(), this.game.getLastActionPlayer(),
                 this.game.getLastActionText(), this.game.getStatusText(),
-                this.game.getWinner(), winningHandButtonBounds, actionButtonBounds, endGameButtonBounds);
+                this.game.getWinner(), winningHandButtonBounds, actionButtonBounds, endGameButtonBounds,
+                autoPlayButtonBounds, autoPlayEnabled);
 
         for (Player p : game.getPlayers()) {
             drawer.drawTable(p.getTable().toList(), p.getPosition());
@@ -385,6 +405,171 @@ public class GamePanel extends JPanel implements Runnable {
         requestFocusInWindow();
     }
 
+    private void toggleAutoPlay() {
+        autoPlayEnabled = !autoPlayEnabled;
+        if (!autoPlayEnabled) {
+            cancelAutoPlayTimer();
+            game.showStatus("Auto Play is off. " + stripAutoPlayStatusPrefix(game.getStatusText()));
+        } else {
+            game.showStatus("Auto Play is on. I will act for you when it is your move.");
+        }
+        repaint();
+        requestFocusInWindow();
+    }
+
+    private void updateAutoPlay() {
+        if (!autoPlayEnabled || game.isOver()) {
+            cancelAutoPlayTimer();
+            return;
+        }
+        if (!isPlayerActionNeeded()) {
+            cancelAutoPlayTimer();
+            return;
+        }
+
+        String actionKey = buildAutoPlayKey();
+        if (autoPlayTimer != null && autoPlayTimer.isRunning() && actionKey.equals(scheduledAutoPlayKey)) {
+            return;
+        }
+
+        cancelAutoPlayTimer();
+        scheduledAutoPlayKey = actionKey;
+        game.showStatus(AUTO_PLAY_PENDING_PREFIX + stripAutoPlayStatusPrefix(game.getStatusText()));
+        autoPlayTimer = new Timer(AUTO_PLAY_DELAY_MS, e -> {
+            cancelAutoPlayTimer();
+            executeAutoPlayAction();
+            repaint();
+        });
+        autoPlayTimer.setRepeats(false);
+        autoPlayTimer.start();
+    }
+
+    private boolean isPlayerActionNeeded() {
+        if (player.containsHu()) {
+            return true;
+        }
+        if (player.isPlaying()) {
+            return true;
+        }
+        return player.containsResponseAction();
+    }
+
+    private String buildAutoPlayKey() {
+        Tile newTile = player.getHand().getNewTile();
+        Tile lastPlayedTile = game.getLastPlayedTile();
+        return game.getActionVersion()
+                + "|" + player.isPlaying()
+                + "|" + player.containsHu()
+                + "|" + player.containsChow()
+                + "|" + player.containsPung()
+                + "|" + player.containsKong()
+                + "|" + player.getHand().toList().hashCode()
+                + "|" + (newTile == null ? "none" : newTile.toString())
+                + "|" + (lastPlayedTile == null ? "none" : lastPlayedTile.toString());
+    }
+
+    private String stripAutoPlayStatusPrefix(String statusText) {
+        if (statusText == null) {
+            return "";
+        }
+        String text = statusText;
+        while (text.startsWith(AUTO_PLAY_PENDING_PREFIX)) {
+            text = text.substring(AUTO_PLAY_PENDING_PREFIX.length());
+        }
+        return text;
+    }
+
+    private void cancelAutoPlayTimer() {
+        if (autoPlayTimer != null) {
+            autoPlayTimer.stop();
+            autoPlayTimer = null;
+        }
+        scheduledAutoPlayKey = "";
+    }
+
+    private void executeAutoPlayAction() {
+        if (!autoPlayEnabled || game.isOver()) {
+            return;
+        }
+
+        if (player.containsHu()) {
+            game.processHu(player);
+            return;
+        }
+
+        if (!player.isPlaying() && player.containsResponseAction()) {
+            executeAutoPlayResponse();
+            return;
+        }
+
+        if (player.isPlaying() && player.containsKong()) {
+            Tile kongTile = findAutoKongTile();
+            autoPlayer.setHand(player.getHand());
+            if (kongTile != null && autoPlayer.shouldKong(kongTile)) {
+                game.processKong(player);
+            } else {
+                game.processSkip(player);
+            }
+            return;
+        }
+
+        if (player.isPlaying()) {
+            Tile tileToPlay = chooseAutoDiscardTile();
+            if (tileToPlay != null) {
+                player.plays(tileToPlay);
+                hoveredTile = null;
+                game.processPlayed();
+            }
+        }
+    }
+
+    private void executeAutoPlayResponse() {
+        Tile tile = game.getLastPlayedTile();
+        if (tile == null) {
+            game.processSkip(player);
+            return;
+        }
+
+        autoPlayer.setHand(player.getHand());
+        if (player.containsKong() && autoPlayer.shouldKong(tile)) {
+            game.processKong(player);
+        } else if (player.containsPung() && autoPlayer.shouldPung(tile)) {
+            game.processPung(player);
+        } else if (player.containsChow() && autoPlayer.shouldChow(tile)) {
+            game.processChou(player);
+        } else {
+            game.processSkip(player);
+        }
+    }
+
+    private Tile chooseAutoDiscardTile() {
+        autoPlayer.setHand(player.getHand());
+        Tile tile = autoPlayer.getTileToPlay();
+        if (tile != null) {
+            return tile;
+        }
+        Tile newTile = player.getHand().getNewTile();
+        if (newTile != null) {
+            return newTile;
+        }
+        List<Tile> tiles = player.getHand().toList();
+        return tiles.isEmpty() ? null : tiles.get(0);
+    }
+
+    private Tile findAutoKongTile() {
+        Tile newTile = player.getHand().getNewTile();
+        if (newTile != null) {
+            return newTile;
+        }
+        List<Tile> tiles = player.getHand().toList();
+        for (Tile tile : tiles) {
+            if (Collections.frequency(tiles, tile) >= 4) {
+                return tile;
+            }
+        }
+        return null;
+    }
+
     private void processEndGameButton(String action) {
         if ("Reward".equals(action)) {
             openReward();
@@ -547,6 +732,7 @@ public class GamePanel extends JPanel implements Runnable {
     }
 
     private void startNewGame() {
+        cancelAutoPlayTimer();
         this.game = new Game();
         this.player = this.game.getPlayers().get(0);
         this.hoveredTile = null;
