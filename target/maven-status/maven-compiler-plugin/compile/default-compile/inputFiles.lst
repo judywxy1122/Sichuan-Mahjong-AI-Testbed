@@ -11,6 +11,12 @@
 /Users/bytedance/work/Sichuan-Mahjong-AI-Testbed/src/main/java/application/gameframe/GamePanel.java
 /Users/bytedance/work/Sichuan-Mahjong-AI-Testbed/src/main/java/application/gameframe/KeyHandler.java
 /Users/bytedance/work/Sichuan-Mahjong-AI-Testbed/src/main/java/application/gameframe/TileImageLoader.java
+/Users/bytedance/work/Sichuan-Mahjong-AI-Testbed/src/main/java/application/gameplay/AutoPlayController.java
+/Users/bytedance/work/Sichuan-Mahjong-AI-Testbed/src/main/java/application/gameplay/LlmPlayController.java
+/Users/bytedance/work/Sichuan-Mahjong-AI-Testbed/src/main/java/application/gameplay/PlayController.java
+/Users/bytedance/work/Sichuan-Mahjong-AI-Testbed/src/main/java/application/gameplay/PlayDecision.java
+/Users/bytedance/work/Sichuan-Mahjong-AI-Testbed/src/main/java/application/gameplay/PlayerActionContext.java
+/Users/bytedance/work/Sichuan-Mahjong-AI-Testbed/src/main/java/application/gameplay/TileCodec.java
 /Users/bytedance/work/Sichuan-Mahjong-AI-Testbed/src/main/java/model/GameState.java
 /Users/bytedance/work/Sichuan-Mahjong-AI-Testbed/src/main/java/model/basic/Entity.java
 /Users/bytedance/work/Sichuan-Mahjong-AI-Testbed/src/main/java/model/basic/Tile.java

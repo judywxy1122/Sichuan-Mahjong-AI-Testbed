@@ -30,6 +30,8 @@ mvn compile exec:java
 
 The game loads tile images from `img/` and AI probability tables from `probability/`, relative to the project root.
 
+For details on Player mode, Auto Play, and LLM Play, see [GAME_MODES.md](GAME_MODES.md).
+
 ### Controls
 
 - Click one of your hand tiles to play it when it is your turn.

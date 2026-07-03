@@ -1,8 +1,12 @@
 package application.gameframe;
 
-import aimodel.ProbabilityAI;
 import application.game.Game;
-import model.GameState;
+import application.gameplay.AutoPlayController;
+import application.gameplay.LlmPlayController;
+import application.gameplay.PlayController;
+import application.gameplay.PlayDecision;
+import application.gameplay.PlayerActionContext;
+import application.gameplay.TileCodec;
 import application.config.Config;
 import model.players.Player;
 import model.basic.Tile;
@@ -43,6 +47,7 @@ public class GamePanel extends JPanel implements Runnable {
     private List<Tile> interactableTiles = new ArrayList<>();
     private Rectangle winningHandButtonBounds = new Rectangle();
     private Rectangle autoPlayButtonBounds = new Rectangle(Config.SCREEN_WIDTH - 190, 35, 145, 40);
+    private Rectangle llmPlayButtonBounds = new Rectangle(Config.SCREEN_WIDTH - 350, 35, 145, 40);
     private Map<String, Rectangle> actionButtonBounds = new LinkedHashMap<>();
     private Map<String, Rectangle> endGameButtonBounds = new LinkedHashMap<>();
     private final ImageIcon rewardIcon = new ImageIcon("img/reward/dollar_sign_01.gif");
@@ -70,12 +75,22 @@ public class GamePanel extends JPanel implements Runnable {
     private final Random rewardRandom = new Random();
     private boolean rewardCelebrationPlayed = false;
     private Timer rewardAnimationTimer;
-    private final ProbabilityAI autoPlayer = new ProbabilityAI();
-    private boolean autoPlayEnabled = false;
-    private Timer autoPlayTimer;
-    private String scheduledAutoPlayKey = "";
-    private static final int AUTO_PLAY_DELAY_MS = 3000;
+    private final AutoPlayController autoPlayController = new AutoPlayController();
+    private final LlmPlayController llmPlayController = new LlmPlayController(autoPlayController);
+    private PlayMode playMode = PlayMode.NONE;
+    private Timer playTimer;
+    private String scheduledPlayKey = "";
+    private boolean llmDecisionInFlight = false;
+    private String llmDecisionKey = "";
+    private static final int PLAY_DELAY_MS = 3000;
     private static final String AUTO_PLAY_PENDING_PREFIX = "Auto Play will act in 3s. ";
+    private static final String LLM_PLAY_PENDING_PREFIX = "LLM Play will act in 3s. ";
+
+    private enum PlayMode {
+        NONE,
+        AUTO,
+        LLM
+    }
 
     public GamePanel() {
         this.game = new Game();
@@ -95,24 +110,34 @@ public class GamePanel extends JPanel implements Runnable {
                 if (logicalPoint == null) {
                     return;
                 }
+                if (llmPlayButtonBounds.contains(logicalPoint)) {
+                    if (playMode == PlayMode.AUTO) {
+                        return;
+                    }
+                    toggleLlmPlay();
+                    return;
+                }
                 if (autoPlayButtonBounds.contains(logicalPoint)) {
+                    if (playMode == PlayMode.LLM) {
+                        return;
+                    }
                     toggleAutoPlay();
                     return;
                 }
                 String endGameAction = getClickedEndGameAction(logicalPoint);
                 if (endGameAction != null) {
-                    cancelAutoPlayTimer();
+                    cancelPlayTimer();
                     processEndGameButton(endGameAction);
                     return;
                 }
                 if (game.getWinner() != null && winningHandButtonBounds.contains(logicalPoint)) {
-                    cancelAutoPlayTimer();
+                    cancelPlayTimer();
                     showWinningHandDialog();
                     return;
                 }
                 String action = getClickedAction(logicalPoint);
                 if (action != null) {
-                    cancelAutoPlayTimer();
+                    cancelPlayTimer();
                     processActionButton(action);
                     return;
                 }
@@ -120,7 +145,7 @@ public class GamePanel extends JPanel implements Runnable {
                     return;
                 }
                 if (player.isPlaying() && !player.containsChouPungKong()) {
-                    cancelAutoPlayTimer();
+                    cancelPlayTimer();
                     player.plays(hoveredTile);
                     hoveredTile = null;
                     game.processPlayed();
@@ -145,6 +170,7 @@ public class GamePanel extends JPanel implements Runnable {
                 }
                 if (getClickedAction(logicalPoint) != null
                         || getClickedEndGameAction(logicalPoint) != null
+                        || llmPlayButtonBounds.contains(logicalPoint)
                         || autoPlayButtonBounds.contains(logicalPoint)
                         || (game.getWinner() != null && winningHandButtonBounds.contains(logicalPoint))) {
                     hoveredTile = null;
@@ -170,7 +196,7 @@ public class GamePanel extends JPanel implements Runnable {
 
     public void update() {
         if (this.game.isOver()) {
-            cancelAutoPlayTimer();
+            cancelPlayTimer();
             this.gameThread = null;
         }
         if (keyHandler.hPressed && !keyHandler.hProcessed
@@ -198,7 +224,7 @@ public class GamePanel extends JPanel implements Runnable {
             this.game.processSkip(player);
             keyHandler.sProcessed = true;
         }
-        updateAutoPlay();
+        updatePlayController();
     }
 
     @Override
@@ -216,7 +242,7 @@ public class GamePanel extends JPanel implements Runnable {
         drawer.drawHelperBoxes(this.game.getTurnPlayer(), this.game.getLastActionPlayer(),
                 this.game.getLastActionText(), this.game.getStatusText(),
                 this.game.getWinner(), winningHandButtonBounds, actionButtonBounds, endGameButtonBounds,
-                autoPlayButtonBounds, autoPlayEnabled);
+                llmPlayButtonBounds, playMode == PlayMode.LLM, autoPlayButtonBounds, playMode == PlayMode.AUTO);
 
         for (Player p : game.getPlayers()) {
             drawer.drawTable(p.getTable().toList(), p.getPosition());
@@ -406,58 +432,75 @@ public class GamePanel extends JPanel implements Runnable {
     }
 
     private void toggleAutoPlay() {
-        autoPlayEnabled = !autoPlayEnabled;
-        if (!autoPlayEnabled) {
-            cancelAutoPlayTimer();
-            game.showStatus("Auto Play is off. " + stripAutoPlayStatusPrefix(game.getStatusText()));
+        if (playMode == PlayMode.AUTO) {
+            setPlayMode(PlayMode.NONE);
+            game.showStatus("Auto Play is off. " + stripPlayStatusPrefix(game.getStatusText()));
         } else {
+            setPlayMode(PlayMode.AUTO);
             game.showStatus("Auto Play is on. I will act for you when it is your move.");
         }
         repaint();
         requestFocusInWindow();
     }
 
-    private void updateAutoPlay() {
-        if (!autoPlayEnabled || game.isOver()) {
-            cancelAutoPlayTimer();
+    private void toggleLlmPlay() {
+        if (playMode == PlayMode.LLM) {
+            setPlayMode(PlayMode.NONE);
+            game.showStatus("LLM Play is off. " + stripPlayStatusPrefix(game.getStatusText()));
+        } else {
+            setPlayMode(PlayMode.LLM);
+            game.showStatus("LLM Play is on. I will decide for you using gpt-5.5 when it is your move.");
+        }
+        repaint();
+        requestFocusInWindow();
+    }
+
+    private void setPlayMode(PlayMode nextMode) {
+        cancelPlayTimer();
+        llmDecisionInFlight = false;
+        llmDecisionKey = "";
+        playMode = nextMode;
+    }
+
+    private void updatePlayController() {
+        if (playMode == PlayMode.NONE || game.isOver()) {
+            cancelPlayTimer();
             return;
         }
         if (!isPlayerActionNeeded()) {
-            cancelAutoPlayTimer();
+            cancelPlayTimer();
+            return;
+        }
+        if (llmDecisionInFlight) {
             return;
         }
 
-        String actionKey = buildAutoPlayKey();
-        if (autoPlayTimer != null && autoPlayTimer.isRunning() && actionKey.equals(scheduledAutoPlayKey)) {
+        String actionKey = buildPlayKey();
+        if (playTimer != null && playTimer.isRunning() && actionKey.equals(scheduledPlayKey)) {
             return;
         }
 
-        cancelAutoPlayTimer();
-        scheduledAutoPlayKey = actionKey;
-        game.showStatus(AUTO_PLAY_PENDING_PREFIX + stripAutoPlayStatusPrefix(game.getStatusText()));
-        autoPlayTimer = new Timer(AUTO_PLAY_DELAY_MS, e -> {
-            cancelAutoPlayTimer();
-            executeAutoPlayAction();
-            repaint();
+        cancelPlayTimer();
+        scheduledPlayKey = actionKey;
+        game.showStatus(getPendingPrefix() + stripPlayStatusPrefix(game.getStatusText()));
+        playTimer = new Timer(PLAY_DELAY_MS, e -> {
+            String key = scheduledPlayKey;
+            cancelPlayTimer();
+            executeControllerAction(key);
         });
-        autoPlayTimer.setRepeats(false);
-        autoPlayTimer.start();
+        playTimer.setRepeats(false);
+        playTimer.start();
     }
 
     private boolean isPlayerActionNeeded() {
-        if (player.containsHu()) {
-            return true;
-        }
-        if (player.isPlaying()) {
-            return true;
-        }
-        return player.containsResponseAction();
+        return new PlayerActionContext(game, player).isActionNeeded();
     }
 
-    private String buildAutoPlayKey() {
+    private String buildPlayKey() {
         Tile newTile = player.getHand().getNewTile();
         Tile lastPlayedTile = game.getLastPlayedTile();
         return game.getActionVersion()
+                + "|" + playMode
                 + "|" + player.isPlaying()
                 + "|" + player.containsHu()
                 + "|" + player.containsChow()
@@ -468,106 +511,137 @@ public class GamePanel extends JPanel implements Runnable {
                 + "|" + (lastPlayedTile == null ? "none" : lastPlayedTile.toString());
     }
 
-    private String stripAutoPlayStatusPrefix(String statusText) {
+    private String stripPlayStatusPrefix(String statusText) {
         if (statusText == null) {
             return "";
         }
         String text = statusText;
-        while (text.startsWith(AUTO_PLAY_PENDING_PREFIX)) {
-            text = text.substring(AUTO_PLAY_PENDING_PREFIX.length());
+        while (text.startsWith(AUTO_PLAY_PENDING_PREFIX) || text.startsWith(LLM_PLAY_PENDING_PREFIX)) {
+            if (text.startsWith(AUTO_PLAY_PENDING_PREFIX)) {
+                text = text.substring(AUTO_PLAY_PENDING_PREFIX.length());
+            } else {
+                text = text.substring(LLM_PLAY_PENDING_PREFIX.length());
+            }
         }
         return text;
     }
 
-    private void cancelAutoPlayTimer() {
-        if (autoPlayTimer != null) {
-            autoPlayTimer.stop();
-            autoPlayTimer = null;
-        }
-        scheduledAutoPlayKey = "";
+    private String getPendingPrefix() {
+        return playMode == PlayMode.LLM ? LLM_PLAY_PENDING_PREFIX : AUTO_PLAY_PENDING_PREFIX;
     }
 
-    private void executeAutoPlayAction() {
-        if (!autoPlayEnabled || game.isOver()) {
-            return;
+    private PlayController getActivePlayController() {
+        if (playMode == PlayMode.LLM) {
+            return llmPlayController;
         }
-
-        if (player.containsHu()) {
-            game.processHu(player);
-            return;
-        }
-
-        if (!player.isPlaying() && player.containsResponseAction()) {
-            executeAutoPlayResponse();
-            return;
-        }
-
-        if (player.isPlaying() && player.containsKong()) {
-            Tile kongTile = findAutoKongTile();
-            autoPlayer.setHand(player.getHand());
-            if (kongTile != null && autoPlayer.shouldKong(kongTile)) {
-                game.processKong(player);
-            } else {
-                game.processSkip(player);
-            }
-            return;
-        }
-
-        if (player.isPlaying()) {
-            Tile tileToPlay = chooseAutoDiscardTile();
-            if (tileToPlay != null) {
-                player.plays(tileToPlay);
-                hoveredTile = null;
-                game.processPlayed();
-            }
-        }
-    }
-
-    private void executeAutoPlayResponse() {
-        Tile tile = game.getLastPlayedTile();
-        if (tile == null) {
-            game.processSkip(player);
-            return;
-        }
-
-        autoPlayer.setHand(player.getHand());
-        if (player.containsKong() && autoPlayer.shouldKong(tile)) {
-            game.processKong(player);
-        } else if (player.containsPung() && autoPlayer.shouldPung(tile)) {
-            game.processPung(player);
-        } else if (player.containsChow() && autoPlayer.shouldChow(tile)) {
-            game.processChou(player);
-        } else {
-            game.processSkip(player);
-        }
-    }
-
-    private Tile chooseAutoDiscardTile() {
-        autoPlayer.setHand(player.getHand());
-        Tile tile = autoPlayer.getTileToPlay();
-        if (tile != null) {
-            return tile;
-        }
-        Tile newTile = player.getHand().getNewTile();
-        if (newTile != null) {
-            return newTile;
-        }
-        List<Tile> tiles = player.getHand().toList();
-        return tiles.isEmpty() ? null : tiles.get(0);
-    }
-
-    private Tile findAutoKongTile() {
-        Tile newTile = player.getHand().getNewTile();
-        if (newTile != null) {
-            return newTile;
-        }
-        List<Tile> tiles = player.getHand().toList();
-        for (Tile tile : tiles) {
-            if (Collections.frequency(tiles, tile) >= 4) {
-                return tile;
-            }
+        if (playMode == PlayMode.AUTO) {
+            return autoPlayController;
         }
         return null;
+    }
+
+    private void cancelPlayTimer() {
+        if (playTimer != null) {
+            playTimer.stop();
+            playTimer = null;
+        }
+        scheduledPlayKey = "";
+    }
+
+    private void executeControllerAction(String actionKey) {
+        PlayController controller = getActivePlayController();
+        if (controller == null || game.isOver()) {
+            return;
+        }
+        if (actionKey == null || !actionKey.equals(buildPlayKey())) {
+            return;
+        }
+
+        if (playMode == PlayMode.LLM) {
+            executeLlmControllerAction(actionKey);
+            return;
+        }
+
+        PlayDecision decision = controller.choose(game, player);
+        executePlayDecision(decision);
+        repaint();
+    }
+
+    private void executeLlmControllerAction(String actionKey) {
+        llmDecisionInFlight = true;
+        llmDecisionKey = actionKey;
+        game.showStatus("LLM Play is thinking... " + stripPlayStatusPrefix(game.getStatusText()));
+        repaint();
+
+        Thread llmThread = new Thread(() -> {
+            PlayDecision decision = llmPlayController.choose(game, player);
+            SwingUtilities.invokeLater(() -> {
+                if (!llmDecisionInFlight || playMode != PlayMode.LLM || game.isOver()) {
+                    return;
+                }
+                if (!llmDecisionKey.equals(buildPlayKey())) {
+                    llmDecisionInFlight = false;
+                    llmDecisionKey = "";
+                    return;
+                }
+                llmDecisionInFlight = false;
+                llmDecisionKey = "";
+                executePlayDecision(decision);
+                repaint();
+            });
+        }, "llm-play-controller");
+        llmThread.setDaemon(true);
+        llmThread.start();
+    }
+
+    private void executePlayDecision(PlayDecision decision) {
+        PlayerActionContext context = new PlayerActionContext(game, player);
+        if (!context.isLegal(decision)) {
+            game.showInvalidInput("Play controller returned an illegal action.");
+            return;
+        }
+
+        addControllerDecisionLog(decision);
+        switch (decision.getAction()) {
+            case HU:
+                game.processHu(player);
+                break;
+            case CHOW:
+                game.processChou(player);
+                break;
+            case PUNG:
+                game.processPung(player);
+                break;
+            case KONG:
+                game.processKong(player);
+                break;
+            case SKIP:
+                game.processSkip(player);
+                break;
+            case DISCARD:
+                Tile discardTile = context.resolveDiscardTile(decision.getTile());
+                if (discardTile != null) {
+                    player.plays(discardTile);
+                    hoveredTile = null;
+                    game.processPlayed();
+                }
+                break;
+            default:
+                break;
+        }
+    }
+
+    private void addControllerDecisionLog(PlayDecision decision) {
+        StringBuilder message = new StringBuilder(decision.getSource())
+                .append(" chose ")
+                .append(decision.getAction().name().toLowerCase());
+        if (decision.getTile() != null) {
+            message.append(" ").append(TileCodec.display(decision.getTile()));
+        }
+        if (decision.getReason() != null && !decision.getReason().isEmpty()) {
+            message.append(": ").append(decision.getReason());
+        }
+        game.getLog().addMessage(message.toString());
     }
 
     private void processEndGameButton(String action) {
@@ -732,7 +806,7 @@ public class GamePanel extends JPanel implements Runnable {
     }
 
     private void startNewGame() {
-        cancelAutoPlayTimer();
+        setPlayMode(PlayMode.NONE);
         this.game = new Game();
         this.player = this.game.getPlayers().get(0);
         this.hoveredTile = null;

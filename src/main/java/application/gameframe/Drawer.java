@@ -136,6 +136,7 @@ public class Drawer {
                                 Player winner, Rectangle winningHandButtonBounds,
                                 Map<String, Rectangle> actionButtonBounds,
                                 Map<String, Rectangle> endGameButtonBounds,
+                                Rectangle llmPlayButtonBounds, boolean llmPlayEnabled,
                                 Rectangle autoPlayButtonBounds, boolean autoPlayEnabled) {
         this.drawPlayerArea(new Entity(Config.PLAYER_HAND_X, Config.PLAYER_HAND_Y, Config.PLAYER_HAND_WIDTH, Config.PLAYER_HAND_HEIGHT),
                 "YOU", 0, turnPlayer, lastActionPlayer);
@@ -149,12 +150,14 @@ public class Drawer {
                 "PREV: AI3", 3, turnPlayer, lastActionPlayer);
 
         this.drawStatusBanner(lastActionText, statusText, winner, winningHandButtonBounds,
-                actionButtonBounds, endGameButtonBounds, autoPlayButtonBounds, autoPlayEnabled);
+                actionButtonBounds, endGameButtonBounds,
+                llmPlayButtonBounds, llmPlayEnabled, autoPlayButtonBounds, autoPlayEnabled);
     }
 
     private void drawStatusBanner(String lastActionText, String statusText, Player winner, Rectangle winningHandButtonBounds,
                                   Map<String, Rectangle> actionButtonBounds,
                                   Map<String, Rectangle> endGameButtonBounds,
+                                  Rectangle llmPlayButtonBounds, boolean llmPlayEnabled,
                                   Rectangle autoPlayButtonBounds, boolean autoPlayEnabled) {
         int x = 25;
         int y = 25;
@@ -177,6 +180,9 @@ public class Drawer {
         g2.setFont(new Font("Arial", Font.PLAIN, 18));
         g2.setColor(Color.WHITE);
         int statusTextWidth = width - 28;
+        if (llmPlayButtonBounds != null && !llmPlayButtonBounds.isEmpty()) {
+            statusTextWidth = Math.min(statusTextWidth, llmPlayButtonBounds.x - x - 28);
+        }
         if (autoPlayButtonBounds != null && !autoPlayButtonBounds.isEmpty()) {
             statusTextWidth = Math.min(statusTextWidth, autoPlayButtonBounds.x - x - 28);
         }
@@ -214,7 +220,13 @@ public class Drawer {
         }
 
         if (autoPlayButtonBounds != null && !autoPlayButtonBounds.isEmpty()) {
-            this.drawAutoPlayButton(autoPlayButtonBounds, autoPlayEnabled);
+            this.drawModeButton(autoPlayButtonBounds, autoPlayEnabled, llmPlayEnabled,
+                    "Auto Play", "Auto Play: ON");
+        }
+
+        if (llmPlayButtonBounds != null && !llmPlayButtonBounds.isEmpty()) {
+            this.drawModeButton(llmPlayButtonBounds, llmPlayEnabled, autoPlayEnabled,
+                    "LLM Play", "LLM Play: ON");
         }
     }
 
@@ -236,19 +248,25 @@ public class Drawer {
         g2.drawString(label, textX, textY);
     }
 
-    private void drawAutoPlayButton(Rectangle bounds, boolean enabled) {
+    private void drawModeButton(Rectangle bounds, boolean enabled, boolean disabled,
+                                String offLabel, String onLabel) {
         g2.setColor(new Color(0, 0, 0, 150));
         g2.fillRoundRect(bounds.x + 4, bounds.y + 4, bounds.width, bounds.height, 8, 8);
 
-        g2.setColor(enabled ? new Color(104, 220, 95) : new Color(255, 242, 78));
+        if (disabled) {
+            g2.setColor(new Color(210, 205, 155));
+        } else {
+            g2.setColor(enabled ? new Color(104, 220, 95) : new Color(255, 242, 78));
+        }
         g2.fillRoundRect(bounds.x, bounds.y, bounds.width, bounds.height, 8, 8);
-        g2.setColor(enabled ? new Color(65, 150, 255) : new Color(20, 35, 30));
+        g2.setColor(disabled ? new Color(110, 110, 100)
+                : enabled ? new Color(65, 150, 255) : new Color(20, 35, 30));
         g2.setStroke(new BasicStroke(3));
         g2.drawRoundRect(bounds.x, bounds.y, bounds.width, bounds.height, 8, 8);
         g2.setStroke(new BasicStroke(1));
 
-        String label = enabled ? "Auto Play: ON" : "Auto Play";
-        g2.setColor(new Color(20, 35, 30));
+        String label = enabled ? onLabel : offLabel;
+        g2.setColor(disabled ? new Color(120, 120, 120) : new Color(20, 35, 30));
         g2.setFont(new Font("Arial", Font.BOLD, 15));
         FontMetrics metrics = g2.getFontMetrics();
         int textX = bounds.x + (bounds.width - metrics.stringWidth(label)) / 2;
