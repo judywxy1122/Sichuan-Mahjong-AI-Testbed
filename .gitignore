@@ -27,3 +27,10 @@ bin/
 
 ### Mac OS ###
 .DS_Store
+
+### Local secrets and Python envs ###
+.env
+.env.*
+.venv/
+venv/
+llm_play_log*.txt

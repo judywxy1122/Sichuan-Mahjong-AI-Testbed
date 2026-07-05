@@ -24,9 +24,9 @@ public class Tiles {
     }
 
     public void remove(Tile tile) {
-        for (Tile t : this.tiles) {
-            if (t.equals(tile)) {
-                this.tiles.remove(t);
+        for (int i = 0; i < this.tiles.size(); i++) {
+            if (this.tiles.get(i).equals(tile)) {
+                this.tiles.remove(i);
                 break;
             }
         }

@@ -118,6 +118,20 @@ The bridge uses an Azure/OpenAI-compatible internal endpoint and expects:
 export GPT_API_SG_KEY="..."
 ```
 
+It also needs a Python interpreter with the `openai` package installed. By
+default, Java runs:
+
+```bash
+python3 scripts/llm_play.py
+```
+
+If your `openai` package is installed in a virtual environment, point the game to
+that interpreter:
+
+```bash
+export MAHJONG_LLM_PYTHON="/path/to/venv/bin/python"
+```
+
 Default model:
 
 ```text

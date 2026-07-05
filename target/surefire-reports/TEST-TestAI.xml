@@ -12,7 +12,7 @@
     <property name="sun.java.launcher" value="SUN_STANDARD"/>
     <property name="user.country" value="US"/>
     <property name="sun.boot.library.path" value="/opt/homebrew/Cellar/openjdk/26.0.1/libexec/openjdk.jdk/Contents/Home/lib"/>
-    <property name="sun.java.command" value="/Users/bytedance/work/Sichuan-Mahjong-AI-Testbed/target/surefire/surefirebooter-20260702170450316_3.jar /Users/bytedance/work/Sichuan-Mahjong-AI-Testbed/target/surefire 2026-07-02T17-04-50_255-jvmRun1 surefire-20260702170450316_1tmp surefire_0-20260702170450316_2tmp"/>
+    <property name="sun.java.command" value="/Users/bytedance/work/Sichuan-Mahjong-AI-Testbed/target/surefire/surefirebooter-20260704191904542_3.jar /Users/bytedance/work/Sichuan-Mahjong-AI-Testbed/target/surefire 2026-07-04T19-19-04_497-jvmRun1 surefire-20260704191904542_1tmp surefire_0-20260704191904542_2tmp"/>
     <property name="http.nonProxyHosts" value="local|*.local|169.254/16|*.169.254/16"/>
     <property name="jdk.debug" value="release"/>
     <property name="surefire.test.class.path" value="/Users/bytedance/work/Sichuan-Mahjong-AI-Testbed/target/test-classes:/Users/bytedance/work/Sichuan-Mahjong-AI-Testbed/target/classes:/Users/bytedance/.m2/repository/com/github/esrrhs/majiang_algorithm/1.0.15/majiang_algorithm-1.0.15.jar:/Users/bytedance/.m2/repository/edu/princeton/cup/java-cup/10k/java-cup-10k.jar:"/>
@@ -29,7 +29,7 @@
     <property name="java.vm.specification.vendor" value="Oracle Corporation"/>
     <property name="java.specification.name" value="Java Platform API Specification"/>
     <property name="apple.awt.application.name" value="ForkedBooter"/>
-    <property name="surefire.real.class.path" value="/Users/bytedance/work/Sichuan-Mahjong-AI-Testbed/target/surefire/surefirebooter-20260702170450316_3.jar"/>
+    <property name="surefire.real.class.path" value="/Users/bytedance/work/Sichuan-Mahjong-AI-Testbed/target/surefire/surefirebooter-20260704191904542_3.jar"/>
     <property name="sun.management.compiler" value="HotSpot 64-Bit Tiered Compilers"/>
     <property name="ftp.nonProxyHosts" value="local|*.local|169.254/16|*.169.254/16"/>
     <property name="java.runtime.version" value="26.0.1"/>

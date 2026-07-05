@@ -95,26 +95,81 @@ public class Drawer {
     }
 
     public void drawLogs(List<String> logs) {
-        g2.setFont(new Font("Arial", Font.PLAIN, 15)); // Choose the font and its size
-        g2.setColor(Color.WHITE); // Choose a color for the text
-        int lineHeight = g2.getFontMetrics().getHeight(); // The height of a line of text
+        g2.setFont(new Font("Arial", Font.PLAIN, 15));
+        FontMetrics metrics = g2.getFontMetrics();
+        int lineHeight = metrics.getHeight();
         int top = 140;
         int bottomPadding = 80;
-        int logWindowWidth = 400; // Width of the log window
-        int logWindowX = this.width - logWindowWidth - 24; // X coordinate of the log window
+        int logWindowWidth = 400;
+        int logWindowX = this.width - logWindowWidth - 24;
         int logWindowHeight = this.height - top - bottomPadding;
         int textPadding = 20;
-        g2.setColor(Color.BLACK); // Set the background color of the log window
-        g2.fillRect(logWindowX, top, logWindowWidth, logWindowHeight);
-        g2.setColor(Color.WHITE); // Change color for the text
+        int textX = logWindowX + textPadding;
+        int textY = top + textPadding;
+        int textWidth = logWindowWidth - textPadding * 2;
 
-        int maxVisibleLogs = Math.max(0, (logWindowHeight - textPadding * 2) / lineHeight);
-        int start = Math.max(0, logs.size() - maxVisibleLogs);
-        for (int i = start; i < logs.size(); i++) {
-            String log = logs.get(i);
+        g2.setColor(Color.BLACK);
+        g2.fillRect(logWindowX, top, logWindowWidth, logWindowHeight);
+        g2.setColor(Color.WHITE);
+
+        List<String> wrappedLines = wrapLogLines(logs, metrics, textWidth);
+        int maxVisibleLines = Math.max(0, (logWindowHeight - textPadding * 2) / lineHeight);
+        int start = Math.max(0, wrappedLines.size() - maxVisibleLines);
+        for (int i = start; i < wrappedLines.size(); i++) {
             int visibleIndex = i - start;
-            g2.drawString(log, logWindowX + textPadding, top + textPadding + visibleIndex * lineHeight);
+            g2.drawString(wrappedLines.get(i), textX, textY + visibleIndex * lineHeight);
         }
+    }
+
+    private List<String> wrapLogLines(List<String> logs, FontMetrics metrics, int maxWidth) {
+        List<String> lines = new ArrayList<>();
+        for (String log : logs) {
+            lines.addAll(wrapText(log, metrics, maxWidth));
+        }
+        return lines;
+    }
+
+    private List<String> wrapText(String text, FontMetrics metrics, int maxWidth) {
+        List<String> lines = new ArrayList<>();
+        if (text == null || text.isEmpty()) {
+            lines.add("");
+            return lines;
+        }
+
+        String[] words = text.split(" ");
+        StringBuilder line = new StringBuilder();
+        for (String word : words) {
+            if (word.isEmpty()) {
+                continue;
+            }
+            String next = line.length() == 0 ? word : line + " " + word;
+            if (metrics.stringWidth(next) <= maxWidth) {
+                line = new StringBuilder(next);
+            } else {
+                if (line.length() > 0) {
+                    lines.add(line.toString());
+                }
+                line = new StringBuilder(word);
+                while (metrics.stringWidth(line.toString()) > maxWidth && line.length() > 1) {
+                    int split = findFittingPrefixLength(line.toString(), metrics, maxWidth);
+                    lines.add(line.substring(0, split));
+                    line = new StringBuilder(line.substring(split));
+                }
+            }
+        }
+        if (line.length() > 0) {
+            lines.add(line.toString());
+        }
+        return lines;
+    }
+
+    private int findFittingPrefixLength(String text, FontMetrics metrics, int maxWidth) {
+        for (int i = text.length(); i > 1; i--) {
+            if (metrics.stringWidth(text.substring(0, i)) <= maxWidth) {
+                return i;
+            }
+        }
+        return 1;
     }
 
     public void drawRect(Entity entity) {

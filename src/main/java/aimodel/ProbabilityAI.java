@@ -4,7 +4,6 @@ import com.github.esrrhs.majiang_algorithm.AIUtil;
 import com.github.esrrhs.majiang_algorithm.MaJiangDef;
 import model.basic.Tile;
 import model.basic.TileTypeEnum;
-import model.tiles.Group;
 import model.tiles.HandTiles;
 
 import java.util.ArrayList;
@@ -17,12 +16,6 @@ public class ProbabilityAI implements AI {
     @Override
     public void setHand(HandTiles hand) {
         this.hand = hand.toList();
-        for (Group group : hand.getPung()) {
-            this.hand.addAll(group.toList());
-        }
-        for (Group group : hand.getKong()) {
-            this.hand.addAll(group.toList());
-        }
         if (hand.getNewTile() != null) {
             this.hand.add(hand.getNewTile());
         }

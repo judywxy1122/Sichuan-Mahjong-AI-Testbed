@@ -27,8 +27,26 @@ public class Player {
     }
 
     public void plays(Tile tile) {
-        this.hand.remove(tile);
-        this.table.add(tile);
+        Tile playedTile = this.hand.removeForDiscard(tile);
+        if (playedTile == null) {
+            playedTile = this.playFallbackTile();
+        }
+        if (playedTile == null) {
+            throw new IllegalArgumentException(this.name + " cannot play unavailable tile: " + tile);
+        }
+        this.table.add(playedTile);
+    }
+
+    private Tile playFallbackTile() {
+        Tile newTile = this.hand.getNewTile();
+        if (newTile != null) {
+            return this.hand.removeForDiscard(newTile);
+        }
+        List<Tile> tiles = this.hand.toList();
+        if (!tiles.isEmpty()) {
+            return this.hand.removeForDiscard(tiles.get(0));
+        }
+        return null;
     }
 
     public String getName() {

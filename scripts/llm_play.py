@@ -17,7 +17,7 @@ import sys
 MODEL = os.environ.get("MAHJONG_LLM_MODEL", "gpt-5.5-2026-04-24")
 API_VERSION = os.environ.get("MAHJONG_LLM_API_VERSION", "2025-01-01-preview")
 REASONING_EFFORT = os.environ.get("MAHJONG_LLM_REASONING", "medium")
-TIMEOUT_SECONDS = float(os.environ.get("MAHJONG_LLM_TIMEOUT_SECONDS", "6"))
+TIMEOUT_SECONDS = float(os.environ.get("MAHJONG_LLM_TIMEOUT_SECONDS", "18"))
 
 
 def default_endpoint() -> str:
@@ -28,19 +28,24 @@ def default_endpoint() -> str:
 
 def build_messages(state: dict) -> list[dict[str, str]]:
     legal_actions = state.get("legal_actions", [])
+    legal_actions_text = ", ".join(legal_actions)
     system = (
         "You are playing Sichuan Mahjong for the human seat. "
-        "Choose exactly one legal action. "
+        "Choose exactly one legal action from the provided legal_actions list. "
+        "Do not choose any action that is not literally allowed by legal_actions. "
         "Return only JSON with fields: action, tile, reason. "
         "Allowed action values: hu, chow, pung, kong, skip, discard. "
-        "For discard, tile must be one of the legal discard tile codes. "
+        "If legal_actions contains discard:X, output action=discard and tile=X. "
+        "For discard, tile must match one of the legal discard tile codes exactly. "
         "For all other actions, tile must be null. "
+        "If legal_actions does not contain any discard:X item, do not discard. "
         "Prefer winning immediately. Prefer legal claims that improve the hand. "
         "If a kong is optional, take it only when it does not obviously damage the hand."
     )
     user = {
         "task": "Choose the next action for the human player.",
         "legal_actions": legal_actions,
+        "legal_actions_text": legal_actions_text,
         "state": state,
         "output_examples": [
             {"action": "hu", "tile": None, "reason": "Winning is available."},
@@ -83,7 +88,7 @@ async def main() -> int:
     response = await client.chat.completions.create(
         model=MODEL,
         messages=build_messages(state),
-        temperature=0.2,
+        temperature=1.0,
         top_p=1.0,
         max_tokens=800,
         response_format={"type": "json_object"},

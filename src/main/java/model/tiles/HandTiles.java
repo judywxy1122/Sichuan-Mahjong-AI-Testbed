@@ -29,19 +29,35 @@ public class HandTiles extends Tiles {
 
     @Override
     public void remove(Tile tile) {
+        this.removeForDiscard(tile);
+    }
+
+    public Tile removeForDiscard(Tile tile) {
+        if (tile == null) {
+            return null;
+        }
         if (tile == this.newTile) {
+            Tile removed = this.newTile;
             this.newTile = null;
             this.sort();
-            return;
+            return removed;
         }
-        for (Tile t : this.tiles) {
-            if (t.equals(tile)) {
-                this.tiles.remove(t);
-                break;
+        for (int i = 0; i < this.tiles.size(); i++) {
+            Tile current = this.tiles.get(i);
+            if (current.equals(tile)) {
+                this.tiles.remove(i);
+                this.mergeNewWithHand();
+                this.sort();
+                return current;
             }
         }
-        this.mergeNewWithHand();
-        this.sort();
+        if (this.newTile != null && this.newTile.equals(tile)) {
+            Tile removed = this.newTile;
+            this.newTile = null;
+            this.sort();
+            return removed;
+        }
+        return null;
     }
 
     private void mergeNewWithHand() {
@@ -72,9 +88,9 @@ public class HandTiles extends Tiles {
 
     public void addAddKong() {
         assert this.newTile != null;
-        for (Group group : this.pung) {
-            if (this.newTile.equals(group.toList().get(0))) {
-                this.pung.remove(group);
+        for (int i = 0; i < this.pung.size(); i++) {
+            if (this.newTile.equals(this.pung.get(i).toList().get(0))) {
+                this.pung.remove(i);
                 break;
             }
         }

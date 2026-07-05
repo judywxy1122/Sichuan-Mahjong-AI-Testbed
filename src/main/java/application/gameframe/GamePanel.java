@@ -95,6 +95,7 @@ public class GamePanel extends JPanel implements Runnable {
     public GamePanel() {
         this.game = new Game();
         this.player = this.game.getPlayers().get(0);
+        this.llmPlayController.markNewGame(this.game);
 
         this.setPreferredSize(getInitialPanelSize());
         this.setMinimumSize(new Dimension(640, 360));
@@ -151,7 +152,7 @@ public class GamePanel extends JPanel implements Runnable {
                     game.processPlayed();
                     repaint();
                 } else if (!player.isPlaying() && player.containsResponseAction()) {
-                    game.showInvalidInput("Response phase: use H/C/P/K to respond, or S to skip.");
+                    game.showInvalidInput(buildResponsePhaseReminder());
                     repaint();
                 } else {
                     game.showInvalidInput("It is not your discard turn yet.");
@@ -429,6 +430,31 @@ public class GamePanel extends JPanel implements Runnable {
         }
         repaint();
         requestFocusInWindow();
+    }
+
+    private String buildResponsePhaseReminder() {
+        List<String> actions = new ArrayList<>();
+        if (player.containsHu()) {
+            actions.add("H Hu");
+        }
+        if (player.containsChow()) {
+            actions.add("C Chow");
+        }
+        if (player.containsPung()) {
+            actions.add("P Pung");
+        }
+        if (player.containsKong()) {
+            actions.add("K Kong");
+        }
+        actions.add("S Skip");
+
+        Player actor = game.getLastActionPlayer();
+        Tile tile = game.getLastPlayedTile();
+        if (actor != null && tile != null) {
+            return actor.getName() + " played " + TileCodec.display(tile)
+                    + "; choose response: " + String.join(" / ", actions) + ".";
+        }
+        return "Response phase: choose response: " + String.join(" / ", actions) + ".";
     }
 
     private void toggleAutoPlay() {
@@ -809,6 +835,7 @@ public class GamePanel extends JPanel implements Runnable {
         setPlayMode(PlayMode.NONE);
         this.game = new Game();
         this.player = this.game.getPlayers().get(0);
+        this.llmPlayController.markNewGame(this.game);
         this.hoveredTile = null;
         this.interactableTiles = new ArrayList<>();
         this.actionButtonBounds = new LinkedHashMap<>();

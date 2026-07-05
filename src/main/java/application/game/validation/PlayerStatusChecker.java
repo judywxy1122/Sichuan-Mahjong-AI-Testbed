@@ -1,6 +1,7 @@
 package application.game.validation;
 
 import model.basic.Tile;
+import model.basic.TileTypeEnum;
 import model.players.Player;
 import model.tiles.Group;
 import model.tiles.GroupEnum;
@@ -73,6 +74,9 @@ public class PlayerStatusChecker {
     }
 
     private boolean checkHu() {
+        if (!this.isMissingOneSuit()) {
+            return false;
+        }
         HuFitter huFitter = new HuFitter(this.pair, this.sequence, this.triple, this.pung, this.kong);
         Set<List<Group>> candidates = huFitter.fitAllHu();
         for (List<Group> groups : candidates) {
@@ -81,6 +85,26 @@ public class PlayerStatusChecker {
             }
         }
         return false;
+    }
+
+    private boolean isMissingOneSuit() {
+        Set<TileTypeEnum> suits = new HashSet<>();
+        for (Tile tile : this.tiles) {
+            suits.add(tile.getType());
+        }
+        for (Group group : this.pung) {
+            addGroupSuits(suits, group);
+        }
+        for (Group group : this.kong) {
+            addGroupSuits(suits, group);
+        }
+        return suits.size() <= 2;
+    }
+
+    private void addGroupSuits(Set<TileTypeEnum> suits, Group group) {
+        for (Tile tile : group.toList()) {
+            suits.add(tile.getType());
+        }
     }
 
     private void generateSets(List<Tile> tiles) {
