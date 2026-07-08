@@ -57,3 +57,10 @@ To customize the AI, follow these steps:
 ## Contributing
 
 We encourage you to contribute to this project, especially in the area of AI development. Please feel free to attach new AI models that not only consider the player's hand but also account for the strategies of other players.
+
+# Updates
+
+## Wrapped run command
+Use this command to run for testing
+./scripts/run_llm_game.sh
+
