@@ -61,8 +61,11 @@ We encourage you to contribute to this project, especially in the area of AI dev
 # Updates
 
 ## Wrapped run command
-Use this command to run for testing, for Java version
+Use this command to run for testing, for Java version:
 ./scripts/run_llm_game.sh
+
+Note: path for Unity run:
+./UnityVersion
 
 ## Thumbnail
 ### Thumbnail Java
