@@ -65,5 +65,5 @@ Use this command to run for testing, for Java version
 ./scripts/run_llm_game.sh
 
 ## Thumbnail
-![Thumbnail](new_thumbnail_Java.png)
-![Thumbnail](new_thumbnail_Unity.png)
+![Thumbnail: Java](new_thumbnail_Java.png)
+![Thumbnail: Unity 2022.3.62f3](new_thumbnail_Unity.png)
