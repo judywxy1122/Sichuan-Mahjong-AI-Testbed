@@ -1,0 +1,17 @@
+{
+    "name": "SichuanMahjong.UnityApp",
+    "rootNamespace": "SichuanMahjong.UnityApp",
+    "references": [
+        "SichuanMahjong.Core",
+        "UnityEngine.UI"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

@@ -1,0 +1,27 @@
+# Unity generated folders
+/[Ll]ibrary/
+/[Tt]emp/
+/[Oo]bj/
+/[Bb]uild/
+/[Bb]uilds/
+/[Ll]ogs/
+/[Uu]serSettings/
+
+# IDE
+.idea/
+.vs/
+.vscode/
+*.csproj
+*.sln
+*.user
+!/Tools/ConsoleHarness/ConsoleHarness.csproj
+
+# OS
+.DS_Store
+
+# Runtime logs written next to the app when playing in-editor
+llm_play_log.txt
+
+# Local console verification harness build output
+/Tools/ConsoleHarness/bin/
+/Tools/ConsoleHarness/obj/
