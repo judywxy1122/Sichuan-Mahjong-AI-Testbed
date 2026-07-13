@@ -11,6 +11,7 @@ namespace SichuanMahjong.UnityApp
         public const int LOG_ITEMS = 39;
         public const bool USE_PHOTO_BACKGROUND = true;
         public const string BACKGROUND_IMAGE_PATH = "img/background/star_sky_over_sea_01.jpg";
+        public const string AVATAR_IMAGE_PATH = "avatars";
 
         // Frame
         public const int ORIGINAL_TILE_SIZE = 16;
@@ -24,10 +25,11 @@ namespace SichuanMahjong.UnityApp
         private const double TILE_HEIGHT_MULTIPLIER = 1.4;
         public const int TILE_WIDTH = TILE_SIZE;                       // 64
         public const int TILE_HEIGHT = (int)(TILE_WIDTH * TILE_HEIGHT_MULTIPLIER); // 89
+        public const int BOARD_VERTICAL_SHIFT = 145;
 
         // Player hand
         public const int PLAYER_HAND_X = 200;
-        public const int PLAYER_HAND_Y = 600;
+        public const int PLAYER_HAND_Y = 600 + BOARD_VERTICAL_SHIFT;
         public const int PLAYER_HAND_WIDTH = 1100;
         public const int PLAYER_HAND_HEIGHT = 200;
         public const int PLAYER_HAND_TOP_INDENT = PLAYER_HAND_Y + 50;
@@ -42,16 +44,23 @@ namespace SichuanMahjong.UnityApp
 
         // Player table
         public const int PLAYER_TABLE_X = 200;
-        public const int PLAYER_TABLE_Y = 500;
+        public const int PLAYER_TABLE_Y = 500 + BOARD_VERTICAL_SHIFT;
         public const int PLAYER_TABLE_WIDTH = PLAYER_HAND_WIDTH;
         public const int PLAYER_TABLE_HEIGHT = 100;
 
         // AI tables
         public const int AI_TABLE_PADDING = 200;
-        public const int AI_TABLE_Y = 145;
+        public const int AI_TABLE_Y = 145 + BOARD_VERTICAL_SHIFT;
         public const int AI_TABLE_WIDTH = 250;
         public const int AI_TABLE_HEIGHT = 260;
         public const int AI_TABLE_NUM_TILES_PER_LINE = 5;
+        public const int AI_AVATAR_WIDTH = 110;
+        public const int AI_AVATAR_HEIGHT = 140;
+        public const int AI_AVATAR_GAP_BELOW = 20;
+        public const int PLAYER_AVATAR_X = 30;
+        public const int PLAYER_AVATAR_Y = PLAYER_HAND_Y + 20;
+        public const int PLAYER_AVATAR_WIDTH = 145;
+        public const int PLAYER_AVATAR_HEIGHT = 145;
 
         public const int AI1_TABLE_X = 100;
         public const int AI1_TABLE_Y = AI_TABLE_Y;

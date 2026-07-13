@@ -622,6 +622,7 @@ namespace SichuanMahjong.UnityApp
             hoveredTile = null;
 
             DrawPlayerAreas();
+            DrawAvatars();
             DrawLogWindow();
 
             Dictionary<string, Rect> actionButtons = BuildActionButtonBounds();
@@ -691,6 +692,32 @@ namespace SichuanMahjong.UnityApp
             UiFactory.CreateBorder(boardLayer, "AreaBorder " + label, x, y, width, height, borderColor, thickness);
             UiFactory.CreateText(boardLayer, "AreaLabel " + label, x + 10, y + 7, width - 20, 20, label, 15,
                 Color.white, true);
+        }
+
+        private void DrawAvatars()
+        {
+            int[] aiTableX = { Config.AI1_TABLE_X, Config.AI2_TABLE_X, Config.AI3_TABLE_X };
+            float aiAvatarY = Config.AI_TABLE_Y - Config.AI_AVATAR_HEIGHT - Config.AI_AVATAR_GAP_BELOW;
+            for (int i = 0; i < aiTableX.Length && i < imageLoader.AiAvatars.Count; i++)
+            {
+                float x = aiTableX[i] + (Config.AI_TABLE_WIDTH - Config.AI_AVATAR_WIDTH) / 2f;
+                CreateAvatar("AIAvatar" + (i + 1), imageLoader.AiAvatars[i], x, aiAvatarY,
+                    Config.AI_AVATAR_WIDTH, Config.AI_AVATAR_HEIGHT);
+            }
+
+            if (imageLoader.PlayerAvatar != null)
+            {
+                CreateAvatar("PlayerAvatar", imageLoader.PlayerAvatar, Config.PLAYER_AVATAR_X,
+                    Config.PLAYER_AVATAR_Y, Config.PLAYER_AVATAR_WIDTH, Config.PLAYER_AVATAR_HEIGHT);
+            }
+        }
+
+        private void CreateAvatar(string name, Sprite sprite, float x, float y, float width, float height)
+        {
+            Image image = UiFactory.CreatePanel(boardLayer, name, x, y, width, height, Color.white);
+            image.sprite = sprite;
+            image.preserveAspect = false;
+            image.raycastTarget = false;
         }
 
         private void DrawLogWindow()

@@ -72,3 +72,5 @@ Note: path for Unity run:
 ![Thumbnail: Java](new_thumbnail_Java.png)
 ### Thumbnail Unity 2022.3.62f3
 ![Thumbnail: Unity 2022.3.62f3](new_thumbnail_Unity.png)
+### Thumbnail Unity 2022.3.62f3, with Avatars
+![Thumbnail: Unity 2022.3.62f3, with Avatars](new_thumbnail_Unity_u01.png)
