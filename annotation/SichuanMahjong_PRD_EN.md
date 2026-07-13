@@ -3,6 +3,7 @@
 > Version: v1.1 (2026-07-10). v1.1: corrected the actual implementation semantics of Seven Pairs / Dragon Seven Pairs against the code (§2.1, §6, Appendix A); clarified the documentation hierarchy.
 > Code baseline: `SichuanMahjong/UnityVersion` (Unity 2022.3 presentation layer + pure C# rules engine, line-by-line port of the Java original)
 > Documentation hierarchy: this PRD covers the feature level only (what/why); function-level interface contracts (signature/params/returns/errors/side effects) are in `SichuanMahjong_Module_Requirements_EN.md`
+> Sync status: this English PRD is not synchronized with the latest Chinese `SichuanMahjong_PRD_v2.md` yet.
 > Positioning: a single-player Sichuan Mahjong game (1 human + 3 probabilistic AIs), and more importantly a **decision-data production environment for the AI mini-game Benchmark** — it already ships with LLM piloting (LlmPlayController), legal-action validation (PlayerActionContext), and headless batch play (ConsoleHarness), making it the most benchmark-ready of the two candidate games.
 
 ---

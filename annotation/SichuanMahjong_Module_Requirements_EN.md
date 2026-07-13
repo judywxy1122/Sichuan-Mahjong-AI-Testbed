@@ -3,7 +3,8 @@
 > Version: v1.1 (2026-07-10)
 > v1.1 revision: following interface-documentation conventions (IEEE 29148 / standard API-reference fields), every function in every module now specifies **purpose, parameters, return value, error & edge-case behavior, and side effects**; each module gains a "Source reference" subsection (original classes/methods → file:line); new §2.4 key-class & enum quick reference; **three important semantics corrected against the code** — ① the actual implementation of Seven Pairs / Dragon Seven Pairs (the previous description was wrong, see M2); ② the Added-Kong status only triggers on the just-drawn tile; ③ the probability AI's tenpai branch is unreachable at runtime because the win tables are never loaded (see M3).
 > Purpose: every standalone module spec can be **handed directly to Codex / Claude Code for independent implementation and testing** (C#/.NET 8 or Python recommended; none require Unity).
-> Companion document: `SichuanMahjong_PRD.md` / `SichuanMahjong_PRD_EN.md` (the PRD stays at the feature level — what/why; this document is authoritative for function-level contracts)
+> Companion document: `SichuanMahjong_PRD_v1.md` / `SichuanMahjong_PRD_EN.md` (the PRD stays at the feature level — what/why; this document is authoritative for function-level contracts)
+> Sync status: this English document is the old v1.1 English reference. The latest Chinese module spec is `SichuanMahjong_模块功能规格文档_v3.md`; this English file has not been synchronized to v2/v3 yet.
 
 ---
 

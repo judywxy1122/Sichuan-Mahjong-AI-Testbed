@@ -1,9 +1,11 @@
 # 四川麻将 模块功能规格文档（面向 AI 编码代理实现）
 
-> 版本：v1.1（2026-07-10）
+> 版本：v3.0（2026-07-13）
+> v3.0 修订：补充 **Unity updated UI 界面排版规格**——牌桌整体下移、AI/player avatar 随机选择与居中裁剪、资源目录、绘制顺序与验收标准；Core 规则、概率 AI、LLM Play 与无头模拟器语义均未改变。**本轮仅更新中文版**（英文版 `SichuanMahjong_Module_Requirements_EN.md` 仍为 v1.1/旧英文参考，待后续同步到 v3）。
+> v2.0 修订：M3 补全**弃牌选择（`out_ai`）与评分函数（`calc`）的完整算法规格**——伪代码、概率表行语义（key 构造 / jiang / p 含义与真实样例行）、数值算例、平分与初值边界、验收锚点；其余模块本轮未改动。**本轮仅更新中文版**（英文版 `SichuanMahjong_Module_Requirements_EN.md` 仍为 v1.1，待下轮同步）。
 > v1.1 修订：按接口文档惯例（IEEE 29148 / API Reference 通行字段）为每个模块的每个函数补全**功能描述、参数说明、返回值、错误与边界行为、副作用**；每个模块新增"源码参照"小节（原实现类/方法→file:line 对照）；新增 §2.4 关键类与枚举速查；**依代码复核修正三处重要语义**——①七对/龙七对的实际实现（原文档描述有误，见 M2）；②加杠状态只对刚摸的牌触发；③概率 AI 的听牌分支因胡表未加载实际不可达（见 M3）。
 > 用途：每个 standalone 模块规格可**直接交给 Codex / Claude Code 独立实现与测试**（推荐 C#/.NET 8 或 Python，均无需 Unity）。
-> 配套文档：`SichuanMahjong_PRD_v1.md`（PRD 停留在特性层 what/why，函数级契约以本文档为准）
+> 配套文档：`SichuanMahjong_PRD_v2.md`（PRD 停留在特性层 what/why，函数级契约以本文档为准）
 
 ---
 
@@ -50,15 +52,15 @@ flowchart TD
 | F 决策与合法性 | PlayDecision 值对象 / 合法动作集生成 / 合法性校验 | `Core/Gameplay/{PlayDecision,PlayerActionContext}.cs` | ✅ |
 | G 控制器 | AutoPlayController / LlmPlayController（HTTP+日志） | `Core/Gameplay/*Controller.cs` | ✅ |
 | H 无头模拟器 | tests / simulate / parity 三命令 | `Tools/ConsoleHarness/Program.cs` | ✅ |
-| I Unity 表现层 | 自举/主循环调度/UI 工厂/牌视图/胡牌展示/奖励 | `UnityApp/*` | ❌（不在本文档实现范围） |
+| I Unity 表现层 | 自举/主循环调度/UI 工厂/牌视图/胡牌展示/奖励/updated UI 头像排版 | `UnityApp/*`、`StreamingAssets/avatars/*` | ❌（Unity 表现层；v3 起补充关键布局规格） |
 
 ### 2.3 模块 × 创意/布局/素材/玩法/日志 对应
 
 | 维度 | 对应模块 |
 |---|---|
 | 创意/规则 | B 状态机（一胡即止/杠连锁）、C 判定（缺一门/七对）、三模式设计（GAME_MODES） |
-| 布局 | I：`Config.cs`（1920×960 逻辑坐标）、`UiFactory`（Swing 坐标系 uGUI 生成）、`GamePanelBehaviour` 各 Draw* |
-| 素材 | `StreamingAssets/img/{Bamboo,Character,Dot}/0N.png` 牌面、背景、50 帧奖励动画、`sound/slot_win_01.wav`、probability 概率表 |
+| 布局 | I：`Config.cs`（1920×960 逻辑坐标）、`UiFactory`（Swing 坐标系 uGUI 生成）、`GamePanelBehaviour` 各 Draw*；v3 updated UI 将 AI/player 牌区整体下移并增加 avatar 锚点 |
+| 素材 | `StreamingAssets/img/{Bamboo,Character,Dot}/0N.png` 牌面、背景、50 帧奖励动画、`StreamingAssets/avatars/{ai_*.png,player_*.png}`、`sound/slot_win_01.wav`、probability 概率表 |
 | 玩法 | E 概率 AI、F 合法性、G 控制器、I 的 3 秒调度与快捷键 |
 | 日志 | `Core/Model/Log.cs`（UI 内存滚动日志）、G 的 `llm_play_log.txt`、CoreEnv.Println 钩子 |
 
@@ -258,13 +260,24 @@ flowchart TD
 
 ### 模块 M3：查表算法层（Probability Table & Scoring）
 
-**功能**：加载概率表并提供"手牌 → 概率评分 / 听牌查询 / 打碰杠决策原语"。复刻 `Core/Algorithm`（esrrhs/majiang_algorithm 运行时子集）。整数牌码宇宙为 42 张（万/筒/条/风/箭/花），本游戏只用 1..27。
-> 弃牌机制的展开解读（表语义、key 构造、评分算例、常见误解澄清）另见 `SichuanMahjong_概率AI弃牌机制.md`。
+**功能**：加载概率表并提供“手牌 → 概率评分 / 听牌查询 / 打碰杠决策原语”。复刻 `Core/Algorithm`（esrrhs/majiang_algorithm 运行时子集）。整数牌码宇宙为 42 张（万/筒/条/风/箭/花），本游戏只用 1..27。
 
-**表文件格式**（`StreamingAssets/probability/`）：
-- `majiang_ai_normal.txt`（87.4MB，810,700 行）：万/筒/条同形共用；
-- `majiang_ai_feng.txt`（1,240 行）、`majiang_ai_jian.txt`（250 行）：本游戏发牌不产生风/箭，但加载顺序（jian→feng→normal）与内容必须保留以保持行为一致；
-- 行格式：`<key> <jiang:0|1> <p:double> <人类可读注释...>`，仅前 3 列参与解析（`TableLoader.cs:15`）；key 为该门 9 位计数拼成的十进制 long。
+**表文件格式与行语义**（`StreamingAssets/probability/`）：
+- `majiang_ai_normal.txt`（87.4MB，810,700 行）：数字门共用——**万/筒/条只要点数分布相同就查同一行**；
+- `majiang_ai_feng.txt`（1,240 行）、`majiang_ai_jian.txt`（250 行）：本游戏发牌不产生风/箭（对应 key 恒为 0），但加载顺序（jian→feng→normal）与内容必须保留以保持行为一致；
+- 行格式：`<key> <jiang:0|1> <p:double> <人类可读注释...>`，仅前 3 列参与解析（`TableLoader.cs:15`）。真实样例行（normal 表）：
+
+```
+0 0 1.0  无将 1.0
+0 1 0.05480530240265118  有将 0.05480530240265118
+12 0 0.0016140602582496414 8万9万9万 无将 0.0016140602582496414
+12 1 0.013707897514633905 8万9万9万 有将 0.013707897514633905
+```
+
+- **key 列**：该门 1..9 点各自张数拼成的十进制数，**1 点在最高位、9 点在个位**（`HuUtil.BuildKeys`，`HuUtil.cs:314`：`key = key*10 + count[rank]`，rank 从 1 迭代到 9）。例：`8万9万9万` → 点数分布 `[0,0,0,0,0,0,0,1,2]` → key = `000000012` = 12。风门 4 位、箭门 3 位，同理。
+- **jiang 列**：该行代表把这门牌按"**其中含将**（雀头对子）"（jiang=1）还是"**不含将**"（jiang=0）的角色去凑面子。同一 key 通常有两行（无将/有将各一行）。
+- **p 列**：该门型在该角色下**最终凑齐所需面子（含将则再加一对）的概率权重**——由 esrrhs/majiang_algorithm 离线预计算后固化进表，**运行时只查表、不做任何概率计算**。两个直觉锚点：空门 key=0 的 `无将 p=1.0`（什么都不缺，视为已完成）、`有将 p≈0.055`（要求空门凭空凑出将，概率极低）；门型越接近完整面子 p 越高。
+- ⚠️ 常见误解：表里**不存在**"某张牌该被弃掉的概率"这类条目——弃牌是"逐一试删后给剩余手牌评分取 argmax"（见 `out_ai`），概率表只是评分的查询底座。
 
 **接口详细说明**：
 
@@ -280,15 +293,52 @@ flowchart TD
 - **功能**：13 张手牌听哪些张（返回赢张整数码列表）。
 - ⚠️ **运行时语义（对拍关键）**：查询依赖 `HuTable*` 三张胡表，**而本游戏从不加载胡表**（`HuTable.cs:5-10` 注释明示）——因此运行时 `is_ting` **恒返回空**。重实现若自行加载/生成胡表，会改变 `calc`/`out_ai` 的行为，导致 parity 失败。**默认要求：不加载胡表，保持恒空**；如需真实听牌功能，作为独立扩展接口并显式声明。
 
-`calc(cards: int[], gui: int[] = []) -> double`
-- **功能**：手牌质量评分：若 `is_ting` 非空 → 返回 `听张数 × 10`（**该分支在本游戏运行时实际不可达**，理由同上）；否则对每门查 AI 概率表，DFS 枚举各门行组合（全局恰一个将），返回组合概率和的最大值（`AIUtil.cs:11-52`）。
-- **参数**：`cards` — 手牌整数码列表；`gui` — 鬼牌（万能牌）列表，本游戏恒空。
+`calc(cards: int[], gui: int[] = []) -> double` ★评分函数（弃牌/碰/杠决策共用的唯一评分核心）
+- **功能**：给一手牌打"成胡潜力"分。它评估的是**手牌整体**（而非某张牌）：把手牌按万/筒/条/风/箭五类拆 key 查概率表，枚举"将放在哪一门"的所有安排，返回最优安排的概率和（`AIUtil.cs:11-52`）。
+- **参数**：`cards` — 手牌整数码列表（13 或 14 张均可）；`gui` — 鬼牌（万能牌）列表，本游戏恒空。
+- **算法**（必须逐条一致，对拍 `AIUtil.Calc` + `CalcAITableInfo`，`AIUtil.cs:54-79`）：
+
+```
+calc(cards, gui=[]):
+  counts ← 42 槽计数向量（本游戏只用 1..27）；gui 牌计入 guiNum 并从 counts 清零（本游戏恒 0）
+  # ① 听牌分支——运行时不可达：依赖的胡表从不加载，is_ting 恒空（见 is_ting 条目）
+  ting ← is_ting(counts, guiNum)
+  if ting 非空: return len(ting) * 10
+  # ② 构造五类 key 并查表（万/筒/条 → normal 表；风 → feng；箭 → jian）
+  keys ← build_keys(counts)
+  rows[k] ← 表[keys[k]]           # 每 key 常见 2 行：jiang=0 / jiang=1
+  # ③ DFS 组合：五类各选一行，全局【恰好一个】jiang=1 行，p 相加，取最大
+  return max{ Σ p(选中行) | 五类各取一行，其中恰有一行 jiang=1 }
+```
+
+- **三条硬语义**（重实现最容易做错的地方）：
+  1. 各门 p 是**相加**（`cur + p`），不是相乘；
+  2. **全局恰好一个将**：某门一旦选了 jiang=1 行，其余门只能选 jiang=0 行；一整套组合里没有任何将行 → 该组合直接丢弃不计；
+  3. 返回所有合法组合中的**最大值**（`ret.Max()`）。
+- **数值算例**（真实表值，可直接作单测锚点）——设手牌只有 `8万9万9万`（其余四类空门）：万 key=12（无将 0.00161 / 有将 0.01371），筒/条 key=0（无将 1.0 / 有将 0.05481），风 key=0（有将 0.05611）、箭 key=0（有将 0.05882）。合法组合 = "恰一门当将"共 5 种：**将放万 = 0.01371+1+1+1+1 = 4.01371（最大，即返回值）**；将放筒 = 0.00161+0.05481+1+1+1 ≈ 3.05642，其余更低。可见空门贡献 1.0 底分，评分实际反映"非空门离完成多远 + 将放哪门最划算"。
 - **错误与边界**：某门 key 查表无行时原实现可能空集 `Max()` 抛异常/空引用——实践中被"normal 表全量加载"掩盖；重实现应显式处理（返回 0 分并记警告）。
 
-`out_ai(cards: int[]) -> int`
-- **功能**：14 张手牌的建议弃牌：枚举弃掉每种（去重）非鬼牌后 `calc` 其余 13 张，取分最高者。
-- **返回**：弃牌整数码；无任何候选得分超过初值 → 返回 0。
-- **错误与边界**：**初始 max 必须为最小正 double**（Java `Double.MIN_VALUE` = C# `double.Epsilon`，**不是** `double.MinValue`/负无穷，`AIUtil.cs:84-86` 注释明示）——这决定了全 0 分手牌的返回值语义。
+`out_ai(cards: int[]) -> int` ★弃牌选择（枚举-评分 argmax）
+- **功能**：当前隐藏手牌集合的建议弃牌（普通摸牌回合通常是 13 张暗手牌 + 1 张 `newTile`；若已有碰/杠面子则数量相应减少）。**注意：不是"查每张牌被弃的概率"**——概率表中不存在该概念；而是对每种候选牌**假设弃掉后**给剩余手牌调 `calc` 评分，弃掉使剩余手牌评分最高的那张（`AIUtil.cs:81-107`）。
+- **局限**：`out_ai` 只看传入的手牌整数码列表；不读取四家弃牌桌、已亮碰/杠、牌墙剩余信息，也不会根据某张牌已经公开出现几次来调整评分。因此它是"手牌结构评分"型 baseline，不是完整牌局信息型 AI。
+- **算法**（必须逐条一致）：
+
+```
+out_ai(input14):
+  max ← ε          # 最小正 double（Java Double.MIN_VALUE 语义 = C# double.Epsilon），不是负无穷
+  ret ← 0
+  for c in input14 按列表顺序、同值只试一次（cache 去重）:
+    if c 是鬼牌: continue            # 本游戏无鬼牌，恒不跳
+    score ← calc(input14 移除一张 c)  # 假设弃掉 c
+    if score > max: max ← score; ret ← c   # 严格大于才更新
+  return ret
+```
+
+- **返回**：弃牌整数码；无任何候选得分超过初值 ε → 返回 0（调用方 `from_card(0)` 未定义，须由 M4 兜底）。
+- **语义细节**（重实现必须一致）：
+  - **平分不换**：比较是严格 `>`，评分并列时**先遍历到的候选获胜**；遍历顺序 = M4 `set_hand` 产出的列表顺序（暗手排序在前、newTile 在末尾）；
+  - **初始 max 必须为最小正 double**（`AIUtil.cs:84-86` 注释明示，**不是** `double.MinValue`/负无穷）——这决定了全 0 分手牌返回 0 的语义；
+  - 复杂度：候选 ≤14 种 × 每次 `calc` 的 DFS（每 key 至多 2 行 → 组合数 ≤2⁵ 量级），单次决策毫秒级。
 
 `peng_ai(cards: int[], card: int) -> bool` / `gang_ai(cards: int[], card: int) -> bool`
 - **功能**：是否碰/杠：碰 = 手含 ≥2 张 card 且 `碰后评分 + award ≥ 碰前评分`；杠 = 手含 ≥3 张且同式（杠删 4 张）。
@@ -306,7 +356,7 @@ flowchart TD
 | `HuUtil.IsHuCard/IsTingCard/BuildKeys` | `HuUtil.cs:46-339` | 胡/听查询 DFS；终止条件 `(guiNum%3==0 && jiang) || (guiNum%3==2 && !jiang)` |
 | `AIUtil.Calc/OutAI/PengAI/GangAI/ChiAI` | `AIUtil.cs:11-224` | 评分与决策原语；ChiAI 存在但本游戏不用（无吃） |
 
-**验收标准**：用真实表文件加载后 key 数与行数一致；固定手牌（ConsoleHarness `tests` 中 TestAI 的手牌）的 `out_ai` 结果与原实现一致；`parity` 格式对拍通过（见 M8）；**`is_ting` 在未加载胡表时恒返回空**的负用例。
+**验收标准**：用真实表文件加载后 key 数与行数一致；固定手牌（ConsoleHarness `tests` 中 TestAI 的手牌）的 `out_ai` 结果与原实现一致；`parity` 格式对拍通过（见 M8）；**`is_ting` 在未加载胡表时恒返回空**的负用例；`calc` 对"`8万9万9万` + 四类空门"手牌返回 ≈4.01371（依上文真实表值算例）；"恰一个将"约束用例（全无将组合不得计入候选）；`out_ai` 平分时返回先遍历到的候选的用例；全 0 分手牌 `out_ai` 返回 0 的用例。
 
 ---
 
@@ -317,7 +367,7 @@ flowchart TD
 **接口详细说明**（`IAI`，`IAI.cs:8-13`）：
 
 `set_hand(hand: HandTiles) -> None`
-- **功能**：快照手牌：暗手 + newTile → 整数码计数列表 `cards`（melds 不计入）。**每次决策前必须先调用**（AI 座位在 `PlayAction/OtherAction` 开头刷新）。
+- **功能**：快照手牌：暗手 + newTile → 整数码计数列表 `cards`（melds、各家弃牌桌、其他公开牌均不计入）。**每次决策前必须先调用**（AI 座位在 `PlayAction/OtherAction` 开头刷新）。
 - **副作用**：替换内部 cards 快照。
 
 `should_pung(tile: Tile) -> bool`
@@ -563,7 +613,88 @@ flowchart TD
 
 ---
 
-## 4. 模块集成关系与实现顺序
+## 4. Unity updated UI 界面排版规格（v3 新增）
+
+本节描述 Unity 表现层的版式规格。它不改变 Core 规则引擎、Auto Play、LLM Play、ConsoleHarness 或胡牌判定语义，只约束视觉布局与素材加载。
+
+### 4.1 布局目标
+
+updated UI 的目标是把原先偏"调试面板"的桌面布局，调整成更接近娱乐场景的牌桌画面：
+
+- 顶部状态栏、右侧 playing log、按钮区保留原有功能与位置逻辑。
+- 三个 AI players 的牌面区域相对于背景整体向下平移，给 AI avatar 留出上方视觉空间。
+- main player 的弃牌区和手牌区相对于背景整体向下平移同样距离，保持牌桌整体重心一致。
+- AI avatar 放在对应 AI 牌面显示区域上方；player avatar 放在 main player 牌面显示区域左侧。
+- avatar 只作为视觉身份提示，不参与游戏状态、动作判断或日志。
+
+### 4.2 坐标与尺寸规格
+
+UnityApp 继续使用 1920×960 逻辑坐标，`GameRoot` 根据窗口等比缩放。v3 新增的核心布局参数位于 `UnityApp/Config.cs`：
+
+| 参数 | 当前值 | 语义 |
+|---|---:|---|
+| `BOARD_VERTICAL_SHIFT` | 145 | AI 牌区、player 弃牌区、player 手牌区统一向下平移的距离 |
+| `AI_AVATAR_WIDTH` / `AI_AVATAR_HEIGHT` | 110 / 140 | AI avatar 显示尺寸 |
+| `AI_AVATAR_GAP_BELOW` | 20 | AI avatar 底部到 AI 牌区顶部的间距 |
+| `PLAYER_AVATAR_X` / `PLAYER_AVATAR_Y` | 30 / `PLAYER_HAND_Y + 20` | player avatar 左上角坐标 |
+| `PLAYER_AVATAR_WIDTH` / `PLAYER_AVATAR_HEIGHT` | 145 / 145 | player avatar 显示尺寸 |
+
+受 `BOARD_VERTICAL_SHIFT` 影响的区域：
+
+- `AI_TABLE_Y = 145 + BOARD_VERTICAL_SHIFT`
+- `PLAYER_TABLE_Y = 500 + BOARD_VERTICAL_SHIFT`
+- `PLAYER_HAND_Y = 600 + BOARD_VERTICAL_SHIFT`
+- `PLAYER_HAND_TOP_INDENT = PLAYER_HAND_Y + 50`
+
+### 4.3 Avatar 素材加载规格
+
+avatar 资源位于：
+
+```
+UnityVersion/Assets/StreamingAssets/avatars/
+```
+
+文件命名约定：
+
+- AI avatars：`ai_*.png`
+- Player avatars：`player_*.png`
+
+加载规则：
+
+1. `TileImageLoader` 优先读取 `Application.streamingAssetsPath/avatars`。
+2. 若该目录不存在，则 fallback 到 repo 根目录 `avatars/`，方便 Editor 开发阶段临时替换素材。
+3. 每次启动游戏时，从 `ai_*.png` 中随机选择最多 3 张，按 AI1、AI2、AI3 顺序使用。
+4. 每次启动游戏时，从 `player_*.png` 中随机选择 1 张作为 main player avatar。
+5. avatar 选择发生在 `TileImageLoader` 初始化阶段，不应在每次 UI redraw 时重新随机，避免界面闪动。
+
+### 4.4 Avatar 裁剪与绘制规格
+
+avatar 采用居中裁剪，而不是等比留白：
+
+- 根据目标显示框宽高比计算源图中心裁剪区域。
+- 源图过宽时裁掉左右边缘。
+- 源图过高时裁掉上下边缘。
+- 裁剪后生成 Sprite，并以固定尺寸绘制。
+
+绘制顺序：
+
+1. `DrawPlayerAreas()`：绘制玩家区域高亮与边框。
+2. `DrawAvatars()`：绘制 AI/player avatar。
+3. `DrawLogWindow()`：绘制右侧日志窗口。
+4. `DrawStatusBanner()`：绘制顶部状态栏、按钮。
+5. `DrawTable()` / `DrawPungKong()` / `DrawPlayerHand()`：绘制牌面。
+6. `DrawRewardCelebration()`：绘制 reward 动画与按钮高亮。
+
+### 4.5 验收标准
+
+- AI1/AI2/AI3 各自上方显示一张 avatar，且不会遮挡顶部状态栏和右侧日志窗口。
+- player avatar 显示在 main player 牌面左侧，且不会遮挡手牌、弃牌区或按钮。
+- AI 牌区、player 弃牌区、player 手牌区相对于 v2 整体向下平移同一距离，桌面重心一致。
+- 新局、窗口缩放、手动/Auto Play/LLM Play 三种模式切换时，avatar 不闪烁、不重新随机、不影响牌面点击。
+- 缺失 `StreamingAssets/avatars` 时，Editor 下可 fallback 到 repo 根目录 `avatars/`；两者都缺失时只打印 warning，不影响游戏可玩性。
+- Core/Tools 无依赖变化；ConsoleHarness 与规则对拍结果不应因本 UI 改动变化。
+
+## 5. 模块集成关系与实现顺序
 
 ```
 M1 牌/编码 ──▶ M2 胡碰杠判定 ──▶ M5 对局状态机 ──▶ M6 合法动作上下文 ──▶ M7 控制器(Auto/LLM)
