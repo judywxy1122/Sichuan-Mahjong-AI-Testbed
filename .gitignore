@@ -34,3 +34,6 @@ bin/
 .venv/
 venv/
 llm_play_log*.txt
+
+### Data
+data/
