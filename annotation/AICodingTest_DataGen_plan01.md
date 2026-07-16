@@ -210,22 +210,31 @@ data/
 
 PRD 可以写清接口和行为，不写具体算法代码、完整条件分支或隐藏答案。对 M3 等表驱动模块，可保留必要数据表资源，但不得保留算法实现副本。
 
-### 5.4 推荐构造顺序
+### 5.4 Phase 2 执行次序（Benchmark Curriculum）
 
-为减少依赖风险，建议按以下顺序逐个生成、审核与验证：
+数据点编号遵循“由低耦合、可观察、低外部依赖，逐步走向规则和全局集成”的顺序，而不是模块编号。每个数据点均从完整的 `data_point_0000` 独立派生，前一个数据点的 AI 输出不会成为后一个数据点的输入。
 
-1. M9：Unity updated UI 排版；
-2. M8：Console Harness；
-3. M6：PlayerActionContext；
-4. M4：ProbabilityAI；
-5. M1：Tile Domain & Codec；
-6. M2：Validator；
-7. M7a：AutoPlayController；
-8. M7b：LlmPlayController；
-9. M3：查表算法层；
-10. M5：Game Engine。
+| 执行序号 | 数据点 | 目标模块 | 为什么先/后做 | 主要验收方式 | 建议移除方式 |
+| ---: | --- | --- | --- | --- |
+| 1 | `data_point_0001` | M9 Unity updated UI 排版 | 边界最清楚、与 Core 解耦、效果可截图人工判断，适合作为第一条端到端数据线试运行。 | Unity Play Mode + 布局/头像截图检查。 | 场景替换或移除 M9 布局/头像绘制逻辑，保留 UI 其余部分。 |
+| 2 | `data_point_0002` | M8 Console Harness | 不影响 Unity 主游戏，命令与输出清晰，可验证 AI 对现有 Core 的调用和命令行工程能力。 | `tests`、`simulate`、`parity` 命令及退出码。 | 直接移除 Harness 的命令分派与实现，保留 `.csproj` 与 Core。 |
+| 3 | `data_point_0003` | M6 PlayerActionContext | 单一安全边界，输入/输出明确，适合测试 AI 在既有规则引擎上恢复合法动作判断。 | 对固定局面断言 legal actions 与非法动作拒绝。 | 直接缺失或接口桩。 |
+| 4 | `data_point_0004` | M4 ProbabilityAI | 局部策略模块，依赖完整 M3 但不修改规则；能测试 AI 调用现有 scoring API 的能力。 | 固定手牌的合法弃牌、确定性与 Auto Play 集成。 | 直接缺失 `ProbabilityAI` 实现，保留 `IAI` 契约。 |
+| 5 | `data_point_0005` | M1 Tile Domain & Codec | 基础领域模型，语义密集但文件范围有限；放在前半段可测 AI 对对象模型和状态不变量的恢复能力。 | codec 往返、排序、摸/弃/碰/杠后的手牌不变量。 | 直接缺失或精简接口桩；必须防止保留可复制的原实现。 |
+| 6 | `data_point_0006` | M2 Hu/Pung/Kong Validator | 规则复杂度显著提高，适合在基础模块任务后测试组合枚举与边界规则实现。 | 标准胡、七对、缺一门、碰、四类杠的正负例。 | 直接缺失验证器实现，保留调用边界。 |
+| 7 | `data_point_0007` | M7a AutoPlayController | 将合法动作空间与概率 AI 组装成控制器；无网络依赖，属于中等集成任务。 | 三秒调度可替换为测试时钟；决策合法且游戏继续。 | 移除 AutoPlayController 实现，保留 `IPlayController`。 |
+| 8 | `data_point_0008` | M7b LlmPlayController | 需要异步 HTTP、解析、超时和 fallback；应在离线控制器验证后再测。 | 本地 mock HTTP；合法、非法、超时、无 key 都有确定结果。 | 移除 LLM 控制器与解析实现；严禁把真实 API key 放入数据点。 |
+| 9 | `data_point_0009` | M3 Probability Table & Scoring | 表文件大、算法细节多，且 M4 依赖它；放后面可单独测查表、评分与 argmax。 | 表加载、评分锚点、候选弃牌评分比较。 | 移除算法实现但保留概率表资源；不得把原算法备份留在工程中。 |
+| 10 | `data_point_0010` | M5 Game Engine | 最大状态机和依赖汇合点，验收成本最高，作为最终综合任务。 | 完整对局：发牌、回合、响应、杠补摸、胡、流局、牌数不变量。 | 直接缺失/接口桩均可，但须把非 M5 模块保留完整。 |
 
-这只是建议顺序，不代表模块编号。每次只推进一个数据点，审核通过后再处理下一个。
+执行原则：
+
+1. 编号与表格顺序固定，便于后续统计不同模型在难度递增任务上的结果；
+2. M7 拆成 M7a（离线 Auto Play）与 M7b（LLM Play）两个任务，避免网络环境把控制器逻辑评测混在一起；
+3. M9 在编号上作为第一个任务，是因为它最适合作为数据构造、AI 生成、Unity 打开、人工截图标注的全流程试点；
+4. M3 虽然是 M4 的底层依赖，但每个 one-hop 输入都来自完整基线，因此先测试 M4 不会缺少 M3；
+5. M5 依赖面最大，最后执行，避免它过早遮蔽前面模块任务的错误来源；
+6. 每次只生成一个 `PRD_x + data_point_x`，先由人工审阅 PRD 和移除边界，再进入 AI Coding 生成与后续标注；不因已规划后续编号而批量生成。
 
 ## 6. Phase 1：生成基线 data_point_0000 和 PRD_all
 
@@ -271,6 +280,17 @@ Phase 1 只有同时满足以下条件才算完成：
 - 人工已审阅并批准 `PRD_all.md`。
 
 ## 7. Phase 2+：每个 one-hop 数据点的标准流程
+
+### 7.1 协作职责边界
+
+本 benchmark 的职责按“输入数据构造”与“AI 输出生成/标注”严格分离：
+
+| 角色 | 负责事项 | 不负责事项 |
+| --- | --- | --- |
+| 数据构造负责人 | 选定 `M_x` 及边界；从 `data_point_0000` 派生 `data_point_x`；选择并执行最小移除策略；编写 `PRD_x.md`；搜索答案残留；检查缺失范围与无泄漏。 | 不运行 AI Coding、不修复 AI 产物、不对 AI 产物做成功判定。 |
+| AI 生成/标注负责人 | 用指定 AI Coding 系统从 `data_point_x + PRD_x` 生成原始 `data_point_x_gen` 与 `GENERATION_MANIFEST.md`；独立执行 Unity/功能评测并写 `EVALUATION.md`；组织人工审阅与审批。 | 不回写或改变已冻结的 `data_point_x`、`PRD_x.md` 或其缺失边界。 |
+
+这一边界确保每个 benchmark 输入在 AI 运行前冻结，生成失败也能作为真实数据被保留和标注。
 
 在用户批准 Phase 1 后，对每个模块重复以下流程：
 
