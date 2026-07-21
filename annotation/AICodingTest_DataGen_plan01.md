@@ -11,9 +11,9 @@
 - 用于验证 AI 实现结果的验收标准；
 - 描述基线、移除模块、文件清单和验证方式的 manifest。
 
-当前只做 **one-hop** 任务：从完整、可运行的基线 `data_point_0000` 中移除一个独立模块 `M_x`，同时提供只要求重建该模块的 `PRD_x.md`，形成待修复输入 `data_point_x`。AI Coding 的第一次输出是 `data_point_x_gen`：它是 AI 在 `data_point_x` 上实现 `M'_x` 后的原始生成产物。愿景是该产物能恢复为可独立打开和运行的 Unity 工程，但这不是生成阶段的既定事实；是否能编译、进入 Play Mode 和复现目标行为，属于后续独立的数据标注/评测阶段。不在本轮构造多模块同时缺失、跨版本迁移或开放式产品设计任务。
+当前只做 **one-hop** 任务：每个 `data_point_000x_input` 都从完整、可运行的基线 `data_point_0000` 移除一个独立模块 `M_x` 后直接派生；不从其他缺失模块的数据点或任何 AI 产物继续派生。每个输入同时提供只要求重建 `M_x` 的 `PRD_x.md`。本流程另创建同编号、无 `_input` 后缀且初始为空的 `data_point_000x/`，供后续独立 AI Coding 流程写入生成产物。是否能编译、进入 Play Mode 和复现目标行为，属于后续独立的数据标注/评测阶段。不在本轮构造多模块同时缺失、跨版本迁移或开放式产品设计任务。
 
-本轮实际交付只到 Phase 1：生成并检查 `data/PRD_all.md` 和 `data/data_point_0000/`。在人工确认前，不生成任何 `data_point_0001+`。
+本轮实际交付只到 Phase 1：生成并检查 `data_points/PRD_all.md` 和 `data_points/data_point_0000/`。在人工确认前，不生成任何 `data_point_0001+`。
 
 ## 2. 数据源、知识源与输出约定
 
@@ -21,7 +21,7 @@
 
 - 源工程：`UnityVersion/`
 - Unity 版本：以 `UnityVersion/ProjectSettings/ProjectVersion.txt` 为唯一准则（当前预期为 Unity `2022.3.62f3`）。
-- 复制后工程：`data/data_point_0000/`
+- 复制后工程：`data_points/data_point_0000/`
 
 ### 2.2 知识源
 
@@ -35,27 +35,26 @@
 ### 2.3 目录与命名
 
 ```text
-data/
+data_points/
   PRD_all.md
   data_point_0000/
     Assets/
     Packages/
     ProjectSettings/
-    Tools/
+    Tools/                         # 可选；仅当数据点需要仓库根 tools 时复制
     README.md
     DATA_POINT_MANIFEST.md
+    DATA_POINT_INDEX.json
     verify_baseline.sh
   PRD_1.md                 # Phase 2 起生成
-  data_point_0001/         # Phase 2 起生成
+  EVALUATION_1.md          # Phase 2 起生成：未填写的人工评测表单
+  data_point_0001_input/  # Phase 2 起生成：移除 M1 后冻结的输入
     ...
     DATA_POINT_MANIFEST.md
-  data_point_0001_gen/     # AI Coding 首次输出；不由数据构造步骤预先提供
-    ...
-    GENERATION_MANIFEST.md
-    EVALUATION.md           # 后续数据标注产物；初始状态为 unlabeled
+  data_point_0001/        # Phase 2 起生成：外部 AI Coding 流程的预留输出目录，初始为空
 ```
 
-`data/` 保持在 `.gitignore` 中。它是本地生成的 benchmark 工作区，不应因运行日志、Unity 缓存或未来测试数据而推送到远端。
+`data_points/` 保持在 `.gitignore` 中。它是本地生成的 benchmark 工作区，不应因运行日志、Unity 缓存或未来测试数据而推送到远端。
 
 ## 3. 统一数据点契约
 
@@ -64,9 +63,9 @@ data/
 ### 3.1 运行状态约定
 
 - `data_point_0000` 是唯一要求在数据构造完成时即可由 Unity Hub 独立打开并进入 Play Mode 的基线；
-- `data_point_x` 是故意移除 `M_x` 的待开发输入。它**不要求**可由 Unity Hub 独立打开并运行，也可以因目标模块缺失而有编译错误、启动错误或缺失功能；
-- `data_point_x_gen` 是 AI Coding 根据 `data_point_x + PRD_x` 首次生成的原始结果，即 `data_point_x + M'_x`。它可能仍有 C# 编译错误、Unity 启动错误或功能偏差；
-- `data_point_x_gen` 只有经后续数据标注确认 Unity Hub 可独立打开、通过编译并进入 Play Mode 后，才被标记为“运行验证通过”；
+- `data_point_000x_input` 是故意移除 `M_x` 的待开发输入。它**不要求**可由 Unity Hub 独立打开并运行，也可以因目标模块缺失而有编译错误、启动错误或缺失功能；
+- `data_point_000x` 是后续独立 AI Coding 流程的预留输出目录。本流程完成时它必须为空，不包含 AI 生成代码、生成记录或评测结论；
+- 后续 AI Coding 以 `data_point_000x_input + PRD_x.md` 为输入，并向 `data_point_000x/` 写入首次生成产物；生成是否通过编译、进入 Play Mode 或复现行为，由后续人工填写 `EVALUATION_x.md` 判定；
 - 无论输入或输出，项目都应携带 `Packages/`、`ProjectSettings/` 和所需资源，不得依赖原仓库目录；首次打开允许 Unity 在自身目录重新生成 `Library/`；
 - 所有运行时资源均应位于相应数据点的 `Assets/StreamingAssets/` 中。
 
@@ -112,33 +111,58 @@ data/
 
 `Source revision` 固定为生成时 `UnityVersion/` 所在 Git commit，确保任何数据点都可以追溯。
 
-每个 AI 首次输出 `data_point_x_gen` 应额外保留 `GENERATION_MANIFEST.md`，至少包含：
+本流程在 `data_points/` 根目录预建 `EVALUATION_x.md`，但不填写任何评测结论。后续人工在该表单记录 Unity 版本、编译结果、Play Mode 结果、模块功能验收结果、错误摘要和最终标签（例如 `compile_failed`、`play_mode_failed`、`functional_failed`、`passed`）。如外部 AI Coding 流程需要生成记录，可自行在输出目录创建 `GENERATION_MANIFEST.md`；它不属于数据构造阶段的必需产物。
+
+每份评测表单至少包含以下骨架：
 
 ```markdown
-# Generation Manifest
+# Evaluation <x>
 
-- Input data point: ../data_point_000x
-- Related PRD: ../PRD_x.md
-- AI coding system/model: <name and version>
-- Generation command or session reference: <reproducible reference>
-- Generation timestamp: <ISO-8601 timestamp>
-- Output scope: data_point_x + M'_x
-- Evaluation status: unlabeled
+## 1. Evaluation Metadata
+
+- Data point: data_point_000x
+- Target module: Mx
+- Related PRD: PRD_x.md
+- Input: data_point_000x_input/
+- Output: data_point_000x/
+- Evaluator: TBD
+- Date: TBD
+- Unity version: 2022.3.62f3
+
+## 2. Unity Launch and Play Mode Gate
+
+| Check | Status (TBD/PASS/FAIL/BLOCKED) | Evidence or error summary |
+| --- | --- | --- |
+| Unity Hub opens the output project | TBD | |
+| C# compilation has no errors | TBD | |
+| Project enters Play Mode | TBD | |
+
+## 3. Manual Functional Test Results
+
+| Test ID | Steps | Expected result | Actual result | Status (PASS/FAIL/NOT RUN) | Notes |
+| --- | --- | --- | --- | --- | --- |
+
+## 4. Manual Regression and Experience Notes
+
+| Area | Observation | Status | Notes |
+| --- | --- | --- | --- |
+
+## 5. Additional Human Feedback
+
+TBD
 ```
-
-后续标注在 `EVALUATION.md` 中记录，至少包括 Unity 版本、编译结果、Play Mode 结果、模块功能验收结果、错误摘要和最终标签（例如 `compile_failed`、`play_mode_failed`、`functional_failed`、`passed`）。生成记录与评测记录必须分离，避免把“AI 已生成”误解为“AI 已通过”。
 
 ### 3.4 生成与数据标注层次
 
 每个 benchmark 任务分为三个阶段：
 
-- **输入数据点检查**：确认 `data_point_x` 的缺失范围只对应 `M_x`，不存在答案泄漏；它不以可编译或可运行作为通过条件；
-- **AI 首次生成**：AI Coding 产出 `data_point_x_gen`，记录模型、提示词/会话引用、时间和文件变化；此阶段只确认有产物，不做成功判定；
-- **后续数据标注/评测**：对 `data_point_x_gen` 进行下面三层检查，并写入 `EVALUATION.md`。
+- **输入数据点检查**：确认 `data_point_000x_input` 的缺失范围只对应 `M_x`，不存在答案泄漏；它不以可编译或可运行作为通过条件；
+- **AI 首次生成**：独立流程将生成产物写入 `data_point_000x/`；此计划不执行生成，也不做成功判定；
+- **后续数据标注/评测**：对 `data_point_000x` 进行下面三层检查，并填写预建的 `EVALUATION_x.md`。
 
 1. **工程层**：Unity Hub 能打开，Console 无 C# 编译错误；
 2. **启动层**：打开 `Main` 场景并进入 Play Mode，主界面显示；
-3. **任务层**：在 `data_point_x_gen` 中，预设验收场景或脚本验证 `M'_x` 是否复现 `M_x` 的目标行为，且缺失模块之外的基线行为未被破坏。
+3. **任务层**：在 `data_point_000x` 中，预设验收场景或脚本验证 `M'_x` 是否复现 `M_x` 的目标行为，且缺失模块之外的基线行为未被破坏。
 
 ## 4. 模块目录与 PRD_all 范围
 
@@ -158,7 +182,7 @@ data/
 
 ### 4.1 PRD_all 的固定章节
 
-`data/PRD_all.md` 必须包含：
+`data_points/PRD_all.md` 必须包含：
 
 1. benchmark 目标与使用方法；
 2. Unity 工程运行前提与目录结构；
@@ -190,9 +214,9 @@ data/
 
 ### 5.2 “移除模块”的实现原则
 
-构造 `data_point_x` 时，可以直接移除实现，也可以为了把任务聚焦在目标模块而采用最小兼容措施。它不需要可独立运行；关键是缺失范围清楚，且 AI 无法从数据点中直接复制答案。可选择以下策略：
+构造 `data_point_000x_input` 时，可以直接移除实现，也可以为了把任务聚焦在目标模块而采用最小兼容措施。它不需要可独立运行；关键是缺失范围清楚，且 AI 无法从数据点中直接复制答案。可选择以下策略：
 
-- **直接缺失方式**：删除目标实现或核心文件；允许 `data_point_x` 出现与 `M_x` 直接相关的编译/运行错误；
+- **直接缺失方式**：删除目标实现或核心文件；允许 `data_point_000x_input` 出现与 `M_x` 直接相关的编译/运行错误；
 - **接口桩方式（可选）**：保留类名、命名空间、公共方法签名与必要类型，但把实现替换为显式 `TODO`/`NotImplementedException` 或确定的占位行为；
 - **编译隔离方式（可选）**：当模块位于可独立的 assembly definition 中，可隔离该程序集以降低无关错误；
 - **场景替换方式（可选）**：UI/素材类模块可保留场景入口，但移除对应渲染/布局逻辑，使目标功能明显缺失。
@@ -234,7 +258,7 @@ PRD 可以写清接口和行为，不写具体算法代码、完整条件分支�
 3. M9 在编号上作为第一个任务，是因为它最适合作为数据构造、AI 生成、Unity 打开、人工截图标注的全流程试点；
 4. M3 虽然是 M4 的底层依赖，但每个 one-hop 输入都来自完整基线，因此先测试 M4 不会缺少 M3；
 5. M5 依赖面最大，最后执行，避免它过早遮蔽前面模块任务的错误来源；
-6. 每次只生成一个 `PRD_x + data_point_x`，先由人工审阅 PRD 和移除边界，再进入 AI Coding 生成与后续标注；不因已规划后续编号而批量生成。
+6. 每次只生成一个 `PRD_x + EVALUATION_x + data_point_000x_input + 空 data_point_000x`，先由人工审阅 PRD 和移除边界，再交给独立 AI Coding 流程；不因已规划后续编号而批量生成。
 
 ## 6. Phase 1：生成基线 data_point_0000 和 PRD_all
 
@@ -242,17 +266,17 @@ PRD 可以写清接口和行为，不写具体算法代码、完整条件分支�
 
 1. 确认工作树状态，记录生成时 Git commit；
 2. 读取 `ProjectVersion.txt`，记录精确 Unity 版本；
-3. 确认 `data/` 在 `.gitignore` 中；
+3. 确认 `data_points/` 在 `.gitignore` 中；
 4. 检查 `UnityVersion/` 是否已有未提交的必需改动。若有，manifest 必须写明基线取自工作树而非纯 commit；
 5. 枚举 Assets、StreamingAssets、Packages、ProjectSettings 和 Tools，确定复制清单。
 
 ### 6.2 创建 data_point_0000
 
-1. 创建 `data/data_point_0000/`；
+1. 创建 `data_points/data_point_0000/`；
 2. 按 3.2 的最小完整工程规则复制文件；
-3. 写入 `DATA_POINT_MANIFEST.md`；
+3. 写入 `DATA_POINT_MANIFEST.md` 和 `DATA_POINT_INDEX.json`；
 4. 写入 `verify_baseline.sh`，至少检查关键目录、`Main.unity`、`ProjectVersion.txt`、概率表和背景/牌面资源是否存在；
-5. 在 Unity Hub 添加 `data/data_point_0000`，使用 manifest 中的 Unity 版本打开；
+5. 在 Unity Hub 添加 `data_points/data_point_0000`，使用 manifest 中的 Unity 版本打开；
 6. 打开 `Main` 场景，进入 Play Mode；
 7. 检查基础玩家模式能发牌、打牌、AI 回合推进，且无脚本编译错误；
 8. 将验证结果、Unity Console 结果和人工观察记入 manifest。
@@ -273,8 +297,8 @@ PRD 可以写清接口和行为，不写具体算法代码、完整条件分支�
 
 Phase 1 只有同时满足以下条件才算完成：
 
-- `data/PRD_all.md` 已生成，包含 M1-M9；
-- `data/data_point_0000/` 可由 Unity Hub 独立打开；
+- `data_points/PRD_all.md` 已生成，包含 M1-M9；
+- `data_points/data_point_0000/` 可由 Unity Hub 独立打开；
 - manifest 记录了来源 revision、Unity 版本和验证结果；
 - 基线在 Play Mode 下可进入基本对局；
 - 人工已审阅并批准 `PRD_all.md`。
@@ -287,22 +311,22 @@ Phase 1 只有同时满足以下条件才算完成：
 
 | 角色 | 负责事项 | 不负责事项 |
 | --- | --- | --- |
-| 数据构造负责人 | 选定 `M_x` 及边界；从 `data_point_0000` 派生 `data_point_x`；选择并执行最小移除策略；编写 `PRD_x.md`；搜索答案残留；检查缺失范围与无泄漏。 | 不运行 AI Coding、不修复 AI 产物、不对 AI 产物做成功判定。 |
-| AI 生成/标注负责人 | 用指定 AI Coding 系统从 `data_point_x + PRD_x` 生成原始 `data_point_x_gen` 与 `GENERATION_MANIFEST.md`；独立执行 Unity/功能评测并写 `EVALUATION.md`；组织人工审阅与审批。 | 不回写或改变已冻结的 `data_point_x`、`PRD_x.md` 或其缺失边界。 |
+| 数据构造负责人 | 选定 `M_x` 及边界；从 `data_point_0000` 派生 `data_point_000x_input`；选择并执行最小移除策略；编写 `PRD_x.md` 和未填写的 `EVALUATION_x.md`；创建空 `data_point_000x/`；搜索答案残留；检查缺失范围与无泄漏。 | 不运行 AI Coding、不修复 AI 产物、不对 AI 产物做成功判定。 |
+| AI 生成/标注负责人 | 用指定 AI Coding 系统从 `data_point_000x_input + PRD_x.md` 向 `data_point_000x/` 生成原始结果；独立执行 Unity/功能评测并填写 `EVALUATION_x.md`；组织人工审阅与审批。 | 不回写或改变已冻结的 `data_point_000x_input`、`PRD_x.md`、`EVALUATION_x.md` 或其缺失边界。 |
 
 这一边界确保每个 benchmark 输入在 AI 运行前冻结，生成失败也能作为真实数据被保留和标注。
 
 在用户批准 Phase 1 后，对每个模块重复以下流程：
 
 1. 选定一个模块 `M_x` 与其边界；
-2. 从 `data_point_0000` 复制出 `data_point_x`；
+2. 从 `data_point_0000` 复制出 `data_point_000x_input`；
 3. 选择并实施最小移除策略；
-4. 编写 `data/PRD_x.md`；
-5. 搜索残留答案并确认没有可复制的实现；
-6. 检查 `data_point_x` 中的缺失范围只对应目标模块，且不存在可复制的答案；不要求该输入工程可运行；
-7. 由指定 AI Coding 系统根据 `data_point_x + PRD_x` 生成 `data_point_x_gen`，保留原始输出和 `GENERATION_MANIFEST.md`；此时不以编译或运行成功作为生成完成条件；
-8. 在独立的数据标注/评测步骤中，对 `data_point_x_gen` 执行工程层、启动层和任务层检查，并写入 `EVALUATION.md`；
-9. 由人工审阅 PRD_x、输入边界和标注结果；
+4. 编写 `data_points/PRD_x.md` 和未填写的 `data_points/EVALUATION_x.md`；
+5. 创建空的 `data_point_000x/`；
+6. 搜索残留答案并确认没有可复制的实现；
+7. 检查 `data_point_000x_input` 中的缺失范围只对应目标模块，且不存在可复制的答案；不要求该输入工程可运行；
+8. 由人工审阅 `PRD_x.md`、`EVALUATION_x.md` 和输入边界，并确认输出目录为空；
+9. 由独立 AI Coding/标注流程后续生成、评测和填写 `EVALUATION_x.md`；
 10. 审批后才开始下一个 `x`。
 
 ## 8. 风险与处理原则
@@ -311,11 +335,11 @@ Phase 1 只有同时满足以下条件才算完成：
 | --- | --- |
 | Unity 复制后丢失资源引用 | 保留 `.meta`，不复制 Library，首次打开后检查 Console 和场景 |
 | 模块删除导致输入工程不编译 | 这是允许的输入状态；记录错误范围。AI 首次输出不要求立即恢复成功，后续标注再记录实际编译/运行结果 |
-| AI 首次输出仍无法运行 | 这是有效 benchmark 结果，不覆盖或丢弃原始 `data_point_x_gen`；在 `EVALUATION.md` 标记失败层级和错误摘要 |
+| AI 首次输出仍无法运行 | 这是有效 benchmark 结果，不覆盖或丢弃 `data_point_000x/` 中的原始产物；在 `EVALUATION_x.md` 标记失败层级和错误摘要 |
 | PRD 写得过于像答案 | 只给需求、契约和验收，不提供完整算法/实现代码 |
 | 文档与代码不一致 | 以代码为准，在 PRD 中记录差异 |
 | LLM Play 依赖密钥和 macOS GUI 环境 | 不把密钥写入数据点；将其标为可选集成验收，基线玩家/Auto Play 必须可离线验证 |
-| data 被 Git 忽略后难以共享 | 把生成工具、规则和文档保留在仓库；数据点通过受控制品存储或压缩包另行分发 |
+| data_points 被 Git 忽略后难以共享 | 把生成工具、规则和文档保留在仓库；数据点通过受控制品存储或压缩包另行分发 |
 
 ## 9. 本轮评审清单
 
@@ -323,9 +347,9 @@ Phase 1 只有同时满足以下条件才算完成：
 
 - `data_point_0000` 采用“最小完整 Unity 工程”而非整个工作目录镜像；
 - M9（updated UI 排版）作为独立 benchmark 模块纳入 M1-M9；
-- `data_point_0000` 必须可独立打开运行；`data_point_x` 可以不运行；`data_point_x_gen` 是未判定的首次 AI 产物，只有后续数据标注通过后才可被认定为可独立打开运行；
+- `data_point_0000` 必须可独立打开运行；`data_point_000x_input` 可以不运行；`data_point_000x` 是外部 AI Coding 的初始空输出目录，只有后续数据标注通过后才可被认定为可独立打开运行；
 - 根据模块特性选择直接缺失、接口桩、编译隔离或场景替换，不以输入工程是否编译作为构造成功标准；
 - 每次只生成一个数据点，并在人审 PRD 后才推进下一点；
-- `data/` 继续保持不进入 Git，代码仓库只保存生成规则、文档与工具。
+- `data_points/` 继续保持不进入 Git，代码仓库只保存生成规则、文档与工具。
 
-批准后，下一步是只执行 Phase 1：创建 `data/PRD_all.md` 和 `data/data_point_0000/`，然后停下来等待审阅。
+批准后，下一步是只执行 Phase 1：创建 `data_points/PRD_all.md` 和 `data_points/data_point_0000/`，然后停下来等待审阅。
